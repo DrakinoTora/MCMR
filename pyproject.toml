@@ -1,0 +1,9 @@
+[build-system]
+requires = ["scikit-build-core", "pybind11"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "mcmr"
+version = "0.1.0"
+description = "Monte Carlo Multi Region Library in C++ with Pybind11"
+authors = [{name = "DrakinoTora"}]
