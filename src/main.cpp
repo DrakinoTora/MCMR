@@ -1,31 +1,31 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include "simulation.hpp"
-#include "physics.hpp"
-#include "io.hpp"
 
 namespace py = pybind11;
 
 PYBIND11_MODULE(_mcmr_cpp, m) {
-    m.doc() = "Library Monte Carlo Transport Neutron (MCMR) C++ Python Binding";
+    py::class_<BoxBoundary>(m, "BoxBoundary")
+        .def(py::init<double, double, double, double>(), py::arg("x1"), py::arg("y1"), py::arg("x2"), py::arg("y2"));
 
-    // Bind Struct Result
-    py::class_<SimulationResult>(m, "SimulationResult")
-        .def_readonly("abs_A", &SimulationResult::abs_A)
-        .def_readonly("abs_B", &SimulationResult::abs_B)
-        .def_readonly("transmisi", &SimulationResult::transmisi)
-        .def_readonly("time_taken", &SimulationResult::time_taken)
-        .def_readonly("E_start", &SimulationResult::E_start)
-        .def_readonly("E_A_escape", &SimulationResult::E_A_escape)
-        .def_readonly("E_B_escape", &SimulationResult::E_B_escape);
+    py::class_<WorldBoundary>(m, "WorldBoundary")
+        .def(py::init<double, double>(), py::arg("max_x"), py::arg("max_y"));
 
-    // Bind Fungsi Simulasi Utama
-    m.def("neutron_sim", &neutron_sim, "Jalankan Simulasi Monte Carlo Neutron",
-          py::arg("a"), py::arg("b"), py::arg("c"), py::arg("N_partikel"), py::arg("analog"),
-          py::arg("E_Al_t"), py::arg("Sig_Al_t"), py::arg("E_Al_s"), py::arg("Sig_Al_s"),
-          py::arg("E_Pb_t"), py::arg("Sig_Pb_t"), py::arg("E_Pb_s"), py::arg("Sig_Pb_s"));
+    py::class_<Tally>(m, "Tally")
+        .def_readonly("absorp_material", &Tally::absorp_material)
+        .def_readonly("absorp_outside", &Tally::absorp_outside)
+        .def_readonly("transmisi", &Tally::transmisi)
+        .def_readonly("time_taken", &Tally::time_taken)
+        .def_readonly("E_born", &Tally::E_born)
+        .def_readonly("E_leak", &Tally::E_leak)
+        .def_readonly("x_history", &Tally::x_history)
+        .def_readonly("y_history", &Tally::y_history);
 
-    // Bind Fungsi Pembantu
-    m.def("simpan_hasil_xml", &simpan_hasil_xml, "Simpan hasil ke file XML",
-          py::arg("res"), py::arg("filename") = "hasil_simulasi.xml");
+    py::class_<Simulation>(m, "Simulation")
+        .def(py::init<int, const std::string&, BoxBoundary, WorldBoundary, int>(),
+             py::arg("N"), py::arg("material_name"), py::arg("box"), py::arg("world"), py::arg("max_history_save") = 50)
+        .def("set_cross_sections", &Simulation::set_cross_sections)
+        .def("run", &Simulation::run)
+        .def("export_xml", &Simulation::export_xml, py::arg("filename") = "mcmr_results.xml")
+        .def("get_tally", &Simulation::get_tally);
 }

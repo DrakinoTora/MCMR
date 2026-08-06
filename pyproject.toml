@@ -4,6 +4,19 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "mcmr"
-version = "0.1.0"
-description = "Monte Carlo Multi Region Library in C++ with Pybind11"
-authors = [{name = "DrakinoTora"}]
+version = "0.2.0"
+description = "Generalized Multi-Region Monte Carlo Neutron Transport Library with Pybind11"
+readme = "README.md"
+authors = [
+    { name = "DrakinoTora" }
+]
+requires-python = ">=3.8"
+dependencies = [
+    "pandas",
+    "beautifulsoup4",
+    "matplotlib",
+    "numpy"
+]
+
+[tool.scikit-build]
+cmake.build-type = "Release"
