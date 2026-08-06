@@ -9,26 +9,40 @@ class ResultsPlotter:
         self.tree = ET.parse(xml_filename)
         self.root = self.tree.getroot()
 
-    def plot_trajectories(self, box_bounds=None, world_bounds=None):
-        plt.figure(figsize=(7, 6))
-        for history in self.root.findall(".//particle_history"):
+    def plot_trajectories(self, box_bounds=None, world_bounds=None, cmap_name='plasma'):
+        born_text = self.root.find(".//energy_born").text
+        e_born_all = np.array(list(map(float, born_text.split(',')))) / 1e6  # eV -> MeV
+
+        histories = self.root.findall(".//particle_history")
+
+        e_born_plotted = np.array([e_born_all[int(h.get("id"))] for h in histories])
+
+        cmap = plt.get_cmap(cmap_name)
+        norm = plt.Normalize(vmin=e_born_plotted.min(), vmax=e_born_plotted.max())
+
+        fig, ax = plt.subplots(figsize=(7, 6))
+        for history, e in zip(histories, e_born_plotted):
             x_vals = list(map(float, history.find("x").text.split(',')))
             y_vals = list(map(float, history.find("y").text.split(',')))
-            plt.plot(x_vals, y_vals, '-o', markersize=2, alpha=0.5)
+            ax.plot(x_vals, y_vals, '-o', markersize=2, alpha=0.7, color=cmap(norm(e)))
 
         if box_bounds:
             x1, y1, x2, y2 = box_bounds
-            plt.gca().add_patch(plt.Rectangle((x1, y1), x2 - x1, y2 - y1, 
-                                              fill=None, edgecolor='red', linewidth=2, label='Box Material'))
+            ax.add_patch(plt.Rectangle((x1, y1), x2 - x1, y2 - y1,
+                                        fill=None, edgecolor='red', linewidth=2, label='Box Material'))
         if world_bounds:
-            plt.xlim(0, world_bounds[0])
-            plt.ylim(0, world_bounds[1])
+            ax.set_xlim(0, world_bounds[0])
+            ax.set_ylim(0, world_bounds[1])
 
-        plt.xlabel('X (cm)')
-        plt.ylabel('Y (cm)')
-        plt.title('Lintasan Neutron (Dari XML Hasil MCMR)')
-        plt.legend()
-        plt.grid(True)
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        fig.colorbar(sm, ax=ax, label='Energy Borm (MeV)')
+
+        ax.set_xlabel('X (cm)')
+        ax.set_ylabel('Y (cm)')
+        ax.set_title('Neutron Path')
+        ax.legend()
+        ax.grid(True)
         plt.show()
 
     def plot_energy_born(self):
@@ -37,9 +51,9 @@ class ResultsPlotter:
             e_born = np.array(list(map(float, text.split(',')))) / 1e6 # MeV
             plt.figure(figsize=(7, 4))
             plt.hist(e_born, bins=50, color='orange', alpha=0.7, density=True)
-            plt.xlabel('Energi (MeV)')
-            plt.ylabel('Densitas Probabilitas')
-            plt.title('Distribusi Energi Neutron Dilahirkan')
+            plt.xlabel('Energy (MeV)')
+            plt.ylabel('Density Probability')
+            plt.title('Born Energy')
             plt.grid(True)
             plt.show()
 
@@ -49,8 +63,8 @@ class ResultsPlotter:
             e_leak = np.array(list(map(float, text.split(',')))) / 1e6 # MeV
             plt.figure(figsize=(7, 4))
             plt.hist(e_leak, bins=50, color='green', alpha=0.7)
-            plt.xlabel('Energi (MeV)')
-            plt.ylabel('Jumlah Partikel')
-            plt.title('Distribusi Energi Neutron Bocor')
+            plt.xlabel('Energy (MeV)')
+            plt.ylabel('Particle')
+            plt.title('Leak Energy')
             plt.grid(True)
             plt.show()
