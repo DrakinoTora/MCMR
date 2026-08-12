@@ -3,7 +3,7 @@ from .cross_section import load_cross_section, load_all_materials
 from .plotter import ResultsPlotter
 
 
-def load_and_run(N, x_world, y_world, x_grid, y_grid, material_matrix, max_save=50):
+def load_and_run(N, x_world, y_world, x_grid, y_grid, material_matrix, sources, max_save=50):
     """Convenience wrapper ala OpenMC.
 
     x_world, y_world : ukuran dunia simulasi (0,0) sampai (x_world, y_world)
@@ -12,8 +12,12 @@ def load_and_run(N, x_world, y_world, x_grid, y_grid, material_matrix, max_save=
     material_matrix   : list 2D nama material, ukurannya harus
                          (len(x_grid)+1) baris x (len(y_grid)+1) kolom
                          material_matrix[i][j] = material di sel kolom-x ke-i, baris-y ke-j
+    sources           : list 2D bobot probabilitas kelahiran neutron, ukuran sama seperti
+                         material_matrix. Tidak perlu dijumlahkan/dinormalisasi sendiri --
+                         cukup angka relatif, mis. [[0,1,1,0],[2,1,1,0],...]. Region dengan
+                         bobot 0 tidak akan pernah jadi tempat lahir neutron.
     """
-    sim = Simulation(N, x_world, y_world, x_grid, y_grid, material_matrix, max_save)
+    sim = Simulation(N, x_world, y_world, x_grid, y_grid, material_matrix, sources, max_save)
     E_tot, Sig_tot, E_scat, Sig_scat = load_all_materials()
     sim.set_cross_sections(E_tot, Sig_tot, E_scat, Sig_scat)
 

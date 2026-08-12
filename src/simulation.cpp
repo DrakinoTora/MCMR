@@ -6,6 +6,7 @@
 #include <random>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
 
 #include <pybind11/pybind11.h>
 namespace py = pybind11;
@@ -14,10 +15,38 @@ Simulation::Simulation(int N, double x_world, double y_world,
                         const std::vector<double>& x_grid,
                         const std::vector<double>& y_grid,
                         const std::vector<std::vector<std::string>>& material_matrix,
+                        const std::vector<std::vector<double>>& sources,
                         int max_save)
     : N_particles(N),
       grid(x_world, y_world, x_grid, y_grid, material_matrix),
-      max_history_save(max_save) {}
+      max_history_save(max_save) {
+
+    int nx = grid.nx();
+    int ny = grid.ny();
+
+    if (static_cast<int>(sources.size()) != nx)
+        throw std::invalid_argument(
+            "sources row (" + std::to_string(sources.size()) +
+            ") must be same as len(x_grid)+1 = " + std::to_string(nx));
+
+    flat_source_weights.resize(nx * ny);
+    double total = 0.0;
+    for (int i = 0; i < nx; ++i) {
+        if (static_cast<int>(sources[i].size()) != ny)
+            throw std::invalid_argument(
+                "sources col " + std::to_string(i) +
+                " must be same as len(y_grid)+1 = " + std::to_string(ny));
+        for (int j = 0; j < ny; ++j) {
+            double w = sources[i][j];
+            if (w < 0.0)
+                throw std::invalid_argument("sources can't be negative value");
+            flat_source_weights[i * ny + j] = w;
+            total += w;
+        }
+    }
+    if (total <= 0.0)
+        throw std::invalid_argument("sum all sources must be greater than 0");
+}
 
 void Simulation::set_cross_sections(
     const std::map<int, std::vector<double>>& E_tot,
@@ -44,10 +73,12 @@ void Simulation::run() {
     auto start_time = std::chrono::high_resolution_clock::now();
 
     std::mt19937 gen(1337);
-    std::uniform_real_distribution<double> dist_x(0.0, grid.world_max_x());
-    std::uniform_real_distribution<double> dist_y(0.0, grid.world_max_y());
     std::uniform_real_distribution<double> dist_phi(0.0, 2.0 * M_PI);
     std::uniform_real_distribution<double> dist_R(0.0, 1.0);
+
+    // born region
+    std::discrete_distribution<int> region_picker(flat_source_weights.begin(), flat_source_weights.end());
+    const int ny = grid.ny();
 
     int step_update = N_particles / 100;
     if (step_update < 1) step_update = 1;
@@ -65,9 +96,16 @@ void Simulation::run() {
             py::module_::import("sys").attr("stdout").attr("flush")();
         }
 
-        // -------- kelahiran partikel: posisi acak di mana saja dalam world --------
-        double x = dist_x(gen);
-        double y = dist_y(gen);
+        int flat_idx = region_picker(gen);
+        int ix = flat_idx / ny;
+        int iy = flat_idx % ny;
+        const Region& birth_region = grid.region_at(ix, iy);
+
+        std::uniform_real_distribution<double> dist_bx(birth_region.x1, birth_region.x2);
+        std::uniform_real_distribution<double> dist_by(birth_region.y1, birth_region.y2);
+        double x = dist_bx(gen);
+        double y = dist_by(gen);
+
         double phi = dist_phi(gen);
         double mu_x = std::cos(phi);
         double mu_y = std::sin(phi);
@@ -82,10 +120,7 @@ void Simulation::run() {
             h_y.push_back(y);
         }
 
-        int ix, iy;
-        bool in_world = grid.find_index(x, y, ix, iy);
-
-        bool alive = in_world;
+        bool alive = true;
         while (alive) {
             const Region& cur_region = grid.region_at(ix, iy);
             const MaterialInfo& cur_mat = cur_region.material;

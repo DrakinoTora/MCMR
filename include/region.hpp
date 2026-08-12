@@ -24,6 +24,8 @@ public:
 
     double world_max_x() const { return x_edges.back(); }
     double world_max_y() const { return y_edges.back(); }
+    int nx() const { return static_cast<int>(regions.size()); }
+    int ny() const { return regions.empty() ? 0 : static_cast<int>(regions[0].size()); }
 
     // index region
     bool find_index(double x, double y, int& ix, int& iy) const;

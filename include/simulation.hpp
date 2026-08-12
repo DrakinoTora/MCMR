@@ -13,6 +13,9 @@ private:
     Grid grid;
     int max_history_save;
 
+    // weight probability born neutron
+    std::vector<double> flat_source_weights;
+
     std::map<int, std::vector<double>> E_data_total;
     std::map<int, std::vector<double>> Sig_data_total;
     std::map<int, std::vector<double>> E_data_scatter;
@@ -25,6 +28,7 @@ public:
                const std::vector<double>& x_grid,
                const std::vector<double>& y_grid,
                const std::vector<std::vector<std::string>>& material_matrix,
+               const std::vector<std::vector<double>>& sources,
                int max_save = 50);
 
     void set_cross_sections(
