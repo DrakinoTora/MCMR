@@ -23,8 +23,8 @@ def load_cross_section(mat_code, mt_code):
 
     if not os.path.exists(file_path):
         raise FileNotFoundError(
-            f"File data '{filename}' tidak ditemukan! "
-            f"Pastikan folder 'data/' terinstall bersama paket mcmr."
+            f"File data '{filename}' not found! "
+            f"Make sure folder 'data/' installed with package mcmr"
         )
 
     with open(file_path, "r") as f:
@@ -41,7 +41,7 @@ def load_cross_section(mat_code, mt_code):
 
 
 def load_all_materials():
-    """Load otomatis seluruh data cross section 4 material."""
+    """Load all cross section data"""
     E_total, Sig_total = {}, {}
     E_scatter, Sig_scatter = {}, {}
 

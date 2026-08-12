@@ -7,8 +7,9 @@ void export_to_xml(const Tally& tally, const std::string& filename) {
     f << "<?xml version=\"1.0\"?>\n";
     f << "<mcmr_results>\n";
     f << "  <summary>\n";
-    f << "    <absorp_material>" << tally.absorp_material << "</absorp_material>\n";
-    f << "    <absorp_outside>" << tally.absorp_outside << "</absorp_outside>\n";
+    for (const auto& kv : tally.absorp_by_material) {
+        f << "    <absorp material=\"" << kv.first << "\">" << kv.second << "</absorp>\n";
+    }
     f << "    <transmisi>" << tally.transmisi << "</transmisi>\n";
     f << "    <time_taken_seconds>" << tally.time_taken << "</time_taken_seconds>\n";
     f << "  </summary>\n";

@@ -12,5 +12,5 @@ MaterialInfo get_material_info(const std::string& name) {
     if (s == "fe" || s == "besi" || s == "iron") return {"Fe", 2631, 56.0};
     if (s == "pb" || s == "timbal" || s == "lead") return {"Pb", 8237, 208.0};
 
-    throw std::invalid_argument("Material '" + name + "' tidak dikenali. Pilih: Be, C, Fe, Pb");
+    throw std::invalid_argument("Material '" + name + "' unknown. Choose: Be, C, Fe, Pb");
 }

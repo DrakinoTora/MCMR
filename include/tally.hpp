@@ -1,10 +1,12 @@
 #pragma once
 #include <vector>
+#include <map>
+#include <string>
 
 struct Tally {
-    int absorp_material = 0;
-    int absorp_outside = 0;
-    int transmisi = 0;
+    // neutron absorb per material
+    std::map<std::string, int> absorp_by_material;
+    int transmisi = 0; // world leak
     double time_taken = 0.0;
 
     std::vector<double> E_born;

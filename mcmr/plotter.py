@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 class ResultsPlotter:
-    """Kelas untuk membaca XML luaran MCMR dan memvisualisasikan grafik."""
+    """graph visualisation"""
     def __init__(self, xml_filename="mcmr_results.xml"):
         self.xml_filename = xml_filename
         self.tree = ET.parse(xml_filename)
@@ -36,11 +36,11 @@ class ResultsPlotter:
 
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
         sm.set_array([])
-        fig.colorbar(sm, ax=ax, label='Energy Borm (MeV)')
+        fig.colorbar(sm, ax=ax, label='Energy born (MeV)')
 
         ax.set_xlabel('X (cm)')
         ax.set_ylabel('Y (cm)')
-        ax.set_title('Neutron Path')
+        ax.set_title('Neutron path')
         ax.legend()
         ax.grid(True)
         plt.show()
@@ -53,7 +53,7 @@ class ResultsPlotter:
             plt.hist(e_born, bins=50, color='orange', alpha=0.7, density=True)
             plt.xlabel('Energy (MeV)')
             plt.ylabel('Density Probability')
-            plt.title('Born Energy')
+            plt.title('Born Energy Distribution')
             plt.grid(True)
             plt.show()
 
@@ -63,8 +63,8 @@ class ResultsPlotter:
             e_leak = np.array(list(map(float, text.split(',')))) / 1e6 # MeV
             plt.figure(figsize=(7, 4))
             plt.hist(e_leak, bins=50, color='green', alpha=0.7)
-            plt.xlabel('Energy (MeV)')
-            plt.ylabel('Particle')
-            plt.title('Leak Energy')
+            plt.xlabel('Energi (MeV)')
+            plt.ylabel('Total Partikel')
+            plt.title('Leakage Energy Distribution')
             plt.grid(True)
             plt.show()

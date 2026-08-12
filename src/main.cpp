@@ -5,15 +5,8 @@
 namespace py = pybind11;
 
 PYBIND11_MODULE(_mcmr_cpp, m) {
-    py::class_<BoxBoundary>(m, "BoxBoundary")
-        .def(py::init<double, double, double, double>(), py::arg("x1"), py::arg("y1"), py::arg("x2"), py::arg("y2"));
-
-    py::class_<WorldBoundary>(m, "WorldBoundary")
-        .def(py::init<double, double>(), py::arg("max_x"), py::arg("max_y"));
-
     py::class_<Tally>(m, "Tally")
-        .def_readonly("absorp_material", &Tally::absorp_material)
-        .def_readonly("absorp_outside", &Tally::absorp_outside)
+        .def_readonly("absorp_by_material", &Tally::absorp_by_material)
         .def_readonly("transmisi", &Tally::transmisi)
         .def_readonly("time_taken", &Tally::time_taken)
         .def_readonly("E_born", &Tally::E_born)
@@ -22,8 +15,16 @@ PYBIND11_MODULE(_mcmr_cpp, m) {
         .def_readonly("y_history", &Tally::y_history);
 
     py::class_<Simulation>(m, "Simulation")
-        .def(py::init<int, const std::string&, BoxBoundary, WorldBoundary, int>(),
-             py::arg("N"), py::arg("material_name"), py::arg("box"), py::arg("world"), py::arg("max_history_save") = 50)
+        .def(py::init<int, double, double,
+                       const std::vector<double>&,
+                       const std::vector<double>&,
+                       const std::vector<std::vector<std::string>>&,
+                       int>(),
+             py::arg("N"),
+             py::arg("x_world"), py::arg("y_world"),
+             py::arg("x_grid"), py::arg("y_grid"),
+             py::arg("material_matrix"),
+             py::arg("max_history_save") = 50)
         .def("set_cross_sections", &Simulation::set_cross_sections)
         .def("run", &Simulation::run)
         .def("export_xml", &Simulation::export_xml, py::arg("filename") = "mcmr_results.xml")

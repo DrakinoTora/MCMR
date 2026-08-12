@@ -9,7 +9,7 @@ find_package(pybind11 REQUIRED)
 
 set(MCMR_SOURCES
     src/material.cpp
-    src/geometry.cpp
+    src/region.cpp
     src/physics.cpp
     src/tally.cpp
     src/exporter.cpp

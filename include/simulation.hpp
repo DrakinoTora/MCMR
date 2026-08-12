@@ -1,18 +1,16 @@
 #pragma once
 #include "particle.hpp"
-#include "geometry.hpp"
+#include "region.hpp"
 #include "material.hpp"
 #include "tally.hpp"
 #include <map>
 #include <string>
+#include <vector>
 
 class Simulation {
 private:
     int N_particles;
-    MaterialInfo mat_box;
-    MaterialInfo mat_outside;
-    BoxBoundary box;
-    WorldBoundary world;
+    Grid grid;
     int max_history_save;
 
     std::map<int, std::vector<double>> E_data_total;
@@ -23,7 +21,11 @@ private:
     Tally results;
 
 public:
-    Simulation(int N, const std::string& mat_name, BoxBoundary b, WorldBoundary w, int max_save = 50);
+    Simulation(int N, double x_world, double y_world,
+               const std::vector<double>& x_grid,
+               const std::vector<double>& y_grid,
+               const std::vector<std::vector<std::string>>& material_matrix,
+               int max_save = 50);
 
     void set_cross_sections(
         const std::map<int, std::vector<double>>& E_tot,
@@ -34,6 +36,6 @@ public:
 
     void run();
     void export_xml(const std::string& filename = "mcmr_results.xml");
-    
+
     Tally get_tally() const { return results; }
 };
