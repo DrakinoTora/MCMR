@@ -3,10 +3,24 @@
 #include <stdexcept>
 #include <limits>
 
+BoundaryType parse_boundary_type(const std::string& name) {
+    std::string s = name;
+    std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+    if (s == "reflective" || s == "reflect" || s == "reflecting")
+        return BoundaryType::Reflective;
+    if (s == "vacuum" || s == "vacum" || s.empty())
+        return BoundaryType::Vacuum;
+    throw std::invalid_argument("Boundary condition '" + name + "' unknown. Choose: vacuum, reflective");
+}
+
 Grid::Grid(double x_world, double y_world,
            const std::vector<double>& x_grid,
            const std::vector<double>& y_grid,
-           const std::vector<std::vector<std::string>>& material_matrix) {
+           const std::vector<std::vector<std::string>>& material_matrix,
+           const std::string& bc_left,
+           const std::string& bc_right,
+           const std::string& bc_bottom,
+           const std::string& bc_top) {
 
     x_edges.push_back(0.0);
     x_edges.insert(x_edges.end(), x_grid.begin(), x_grid.end());
@@ -47,33 +61,66 @@ Grid::Grid(double x_world, double y_world,
             regions[i][j] = r;
         }
     }
+
+    bc_left_   = parse_boundary_type(bc_left);
+    bc_right_  = parse_boundary_type(bc_right);
+    bc_bottom_ = parse_boundary_type(bc_bottom);
+    bc_top_    = parse_boundary_type(bc_top);
 }
 
 bool Grid::find_index(double x, double y, int& ix, int& iy) const {
     if (x < x_edges.front() || x > x_edges.back() ||
         y < y_edges.front() || y > y_edges.back()) {
-        return false; // outside world
+        return false;
     }
 
     ix = static_cast<int>(std::upper_bound(x_edges.begin(), x_edges.end(), x) - x_edges.begin()) - 1;
     iy = static_cast<int>(std::upper_bound(y_edges.begin(), y_edges.end(), y) - y_edges.begin()) - 1;
 
-    // x == x_world still in cell
     ix = std::clamp(ix, 0, static_cast<int>(regions.size()) - 1);
     iy = std::clamp(iy, 0, static_cast<int>(regions[0].size()) - 1);
     return true;
 }
 
-double Grid::distance_to_boundary(double x, double y, double mu_x, double mu_y, int ix, int iy) const {
+double Grid::distance_to_boundary(double x, double y, double mu_x, double mu_y,
+                                   int ix, int iy, Side& hit_side) const {
     const Region& r = regions[ix][iy];
     double d_min = std::numeric_limits<double>::infinity();
     const double eps = 1e-12;
+    hit_side = Side::None;
 
-    if (mu_x > eps)       d_min = std::min(d_min, (r.x2 - x) / mu_x);
-    else if (mu_x < -eps) d_min = std::min(d_min, (r.x1 - x) / mu_x);
+    const int nx = static_cast<int>(regions.size());
+    const int ny = static_cast<int>(regions[0].size());
 
-    if (mu_y > eps)       d_min = std::min(d_min, (r.y2 - y) / mu_y);
-    else if (mu_y < -eps) d_min = std::min(d_min, (r.y1 - y) / mu_y);
+    if (mu_x > eps) {
+        double d = (r.x2 - x) / mu_x;
+        if (d < d_min) { d_min = d; hit_side = (ix == nx - 1) ? Side::Right : Side::None; }
+    } else if (mu_x < -eps) {
+        double d = (r.x1 - x) / mu_x;
+        if (d < d_min) { d_min = d; hit_side = (ix == 0) ? Side::Left : Side::None; }
+    }
 
-    return (d_min <= 0.0) ? 1e-6 : d_min;
+    if (mu_y > eps) {
+        double d = (r.y2 - y) / mu_y;
+        if (d < d_min) { d_min = d; hit_side = (iy == ny - 1) ? Side::Top : Side::None; }
+    } else if (mu_y < -eps) {
+        double d = (r.y1 - y) / mu_y;
+        if (d < d_min) { d_min = d; hit_side = (iy == 0) ? Side::Bottom : Side::None; }
+    }
+
+    if (d_min <= 0.0) {
+        hit_side = Side::None;
+        return 1e-6;
+    }
+    return d_min;
+}
+
+BoundaryType Grid::bc_for_side(Side s) const {
+    switch (s) {
+        case Side::Left:   return bc_left_;
+        case Side::Right:  return bc_right_;
+        case Side::Bottom: return bc_bottom_;
+        case Side::Top:    return bc_top_;
+        default:           return BoundaryType::Vacuum;
+    }
 }

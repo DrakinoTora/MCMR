@@ -25,11 +25,15 @@ private:
 
 public:
     Simulation(int N, double x_world, double y_world,
-               const std::vector<double>& x_grid,
-               const std::vector<double>& y_grid,
-               const std::vector<std::vector<std::string>>& material_matrix,
-               const std::vector<std::vector<double>>& sources,
-               int max_save = 50);
+           const std::vector<double>& x_grid,
+           const std::vector<double>& y_grid,
+           const std::vector<std::vector<std::string>>& material_matrix,
+           const std::vector<std::vector<double>>& sources,
+           int max_save = 50,
+           const std::string& bc_top   = "vacuum",
+           const std::string& bc_bot   = "vacuum",
+           const std::string& bc_left  = "vacuum",
+           const std::string& bc_right = "vacuum");
 
     void set_cross_sections(
         const std::map<int, std::vector<double>>& E_tot,

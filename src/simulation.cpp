@@ -16,9 +16,14 @@ Simulation::Simulation(int N, double x_world, double y_world,
                         const std::vector<double>& y_grid,
                         const std::vector<std::vector<std::string>>& material_matrix,
                         const std::vector<std::vector<double>>& sources,
-                        int max_save)
+                        int max_save,
+                        const std::string& bc_top,
+                        const std::string& bc_bot,
+                        const std::string& bc_left,
+                        const std::string& bc_right)
     : N_particles(N),
-      grid(x_world, y_world, x_grid, y_grid, material_matrix),
+      grid(x_world, y_world, x_grid, y_grid, material_matrix,
+           bc_left, bc_right, bc_bot, bc_top),
       max_history_save(max_save) {
 
     int nx = grid.nx();
@@ -130,28 +135,46 @@ void Simulation::run() {
 
             double R = dist_R(gen);
             double d_coll = -std::log(R) / Sigma_t;
-            double d_surf = grid.distance_to_boundary(x, y, mu_x, mu_y, ix, iy);
+
+            Side hit_side;
+            double d_surf = grid.distance_to_boundary(x, y, mu_x, mu_y, ix, iy, hit_side);
 
             double d = std::min(d_coll, d_surf);
             x += d * mu_x;
             y += d * mu_y;
 
-            int next_ix, next_iy;
-            bool still_in_world = grid.find_index(x, y, next_ix, next_iy);
-
-            if (!still_in_world) {
-                // vacum
-                results.transmisi++;
-                results.E_leak.push_back(E);
-                alive = false;
-                break;
-            }
-
             if (d_coll >= d_surf) {
+                if (hit_side != Side::None) {
+                    BoundaryType bc = grid.bc_for_side(hit_side);
+
+                    if (bc == BoundaryType::Vacuum) {
+                        results.transmisi++;
+                        results.E_leak.push_back(E);
+                        alive = false;
+                        break;
+                    } else {
+                        if (hit_side == Side::Left || hit_side == Side::Right) {
+                            mu_x = -mu_x;
+                        } else {
+                            mu_y = -mu_y;
+                        }
+                        if (save_history) {
+                            h_x.push_back(x);
+                            h_y.push_back(y);
+                        }
+                        continue;
+                    }
+                }
+
                 x += 1e-6 * mu_x;
                 y += 1e-6 * mu_y;
                 grid.find_index(x, y, ix, iy);
                 continue;
+            }
+
+            if (save_history) {
+                h_x.push_back(x);
+                h_y.push_back(y);
             }
 
             if (save_history) {
