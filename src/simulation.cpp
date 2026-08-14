@@ -29,23 +29,26 @@ Simulation::Simulation(int N, double x_world, double y_world,
     int nx = grid.nx();
     int ny = grid.ny();
 
-    if (static_cast<int>(sources.size()) != nx)
+    if (static_cast<int>(sources.size()) != ny)
         throw std::invalid_argument(
-            "sources row (" + std::to_string(sources.size()) +
-            ") must be same as len(x_grid)+1 = " + std::to_string(nx));
+            "sources row count (" + std::to_string(sources.size()) +
+            ") must be same as len(y_grid)+1 = " + std::to_string(ny));
 
     flat_source_weights.resize(nx * ny);
     double total = 0.0;
-    for (int i = 0; i < nx; ++i) {
-        if (static_cast<int>(sources[i].size()) != ny)
+    for (int row = 0; row < ny; ++row) {
+        if (static_cast<int>(sources[row].size()) != nx)
             throw std::invalid_argument(
-                "sources col " + std::to_string(i) +
-                " must be same as len(y_grid)+1 = " + std::to_string(ny));
-        for (int j = 0; j < ny; ++j) {
-            double w = sources[i][j];
+                "sources row " + std::to_string(row) +
+                " col count must be same as len(x_grid)+1 = " + std::to_string(nx));
+
+        int iy = ny - 1 - row;
+        for (int col = 0; col < nx; ++col) {
+            int ix = col;
+            double w = sources[row][col];
             if (w < 0.0)
                 throw std::invalid_argument("sources can't be negative value");
-            flat_source_weights[i * ny + j] = w;
+            flat_source_weights[ix * ny + iy] = w;
             total += w;
         }
     }

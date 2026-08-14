@@ -38,27 +38,30 @@ Grid::Grid(double x_world, double y_world,
     int nx = static_cast<int>(x_edges.size()) - 1;
     int ny = static_cast<int>(y_edges.size()) - 1;
 
-    if (static_cast<int>(material_matrix.size()) != nx)
+    // Konvensi material_matrix[row][col]:
+    if (static_cast<int>(material_matrix.size()) != ny)
         throw std::invalid_argument(
-            "material row (" + std::to_string(material_matrix.size()) +
-            ") must be same as len(x_grid)+1 = " + std::to_string(nx));
+            "material_matrix row count (" + std::to_string(material_matrix.size()) +
+            ") must be same as len(y_grid)+1 = " + std::to_string(ny));
 
-    regions.resize(nx);
-    for (int i = 0; i < nx; ++i) {
-        if (static_cast<int>(material_matrix[i].size()) != ny)
+    regions.assign(nx, std::vector<Region>(ny));
+    for (int row = 0; row < ny; ++row) {
+        if (static_cast<int>(material_matrix[row].size()) != nx)
             throw std::invalid_argument(
-                "material col " + std::to_string(i) +
-                " must be same as len(y_grid)+1 = " + std::to_string(ny));
+                "material_matrix row " + std::to_string(row) +
+                " col count must be same as len(x_grid)+1 = " + std::to_string(nx));
 
-        regions[i].resize(ny);
-        for (int j = 0; j < ny; ++j) {
+        int iy = ny - 1 - row; // row atas (row=0) -> iy tertinggi
+        for (int col = 0; col < nx; ++col) {
+            int ix = col; // col kiri (col=0) -> ix=0
+
             Region r;
-            r.x1 = x_edges[i];
-            r.x2 = x_edges[i + 1];
-            r.y1 = y_edges[j];
-            r.y2 = y_edges[j + 1];
-            r.material = get_material_info(material_matrix[i][j]);
-            regions[i][j] = r;
+            r.x1 = x_edges[ix];
+            r.x2 = x_edges[ix + 1];
+            r.y1 = y_edges[iy];
+            r.y2 = y_edges[iy + 1];
+            r.material = get_material_info(material_matrix[row][col]);
+            regions[ix][iy] = r;
         }
     }
 
