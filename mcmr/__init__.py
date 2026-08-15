@@ -2,7 +2,7 @@ from ._mcmr_cpp import Tally, Simulation
 from .cross_section import load_cross_section, load_all_materials
 from .plotter import ResultsPlotter
 from .world import export_world, load_world
-
+from .geometry import Geometry
 
 def load_and_run(N, x_world, y_world, x_grid, y_grid, material_matrix, sources, max_save=50,
                   bc_top="vacuum", bc_bot="vacuum", bc_left="vacuum", bc_right="vacuum"):
@@ -59,5 +59,6 @@ __all__ = [
     "run_from_world",
     "export_world",
     "load_world",
+    "Geometry",
     "load_all_materials",
 ]
