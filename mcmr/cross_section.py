@@ -23,8 +23,8 @@ def load_cross_section(mat_code, mt_code):
 
     if not os.path.exists(file_path):
         raise FileNotFoundError(
-            f"File data '{filename}' not found! "
-            f"Make sure folder 'data/' installed with package mcmr"
+            f"Data file '{filename}' not found! "
+            f"Make sure the 'data/' folder is installed with the mcmr package."
         )
 
     with open(file_path, "r") as f:

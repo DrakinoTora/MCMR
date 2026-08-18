@@ -4,20 +4,20 @@ __all__ = ["World"]
 
 
 class World:
-    """Representasi tunggal sebuah dunia simulasi -- geometri, grid, material, sumber, boundary.
+    """Single representation of a simulation world -- geometry, grid, materials, sources, boundary.
 
-    Ini adalah SATU-SATUNYA jalur, tidak peduli dunia itu didefinisikan manual
-    (array mentah) atau lewat Geometry builder:
+    This is the ONLY path, regardless of whether the world was defined manually
+    (raw arrays) or via the Geometry builder:
 
         world = mcmr.World(x_world=50, y_world=50, x_grid=[...], y_grid=[...],
                             material_matrix=[...], sources=[...])
-        world = geom.build()                    # dari Geometry, hasilnya juga World
+        world = geom.build()                    # from Geometry, the result is also a World
 
-    Dari titik ini, jalurnya identik:
+    From this point on, the path is identical:
 
-        sim = world.run(N=5000)                 # jalankan simulasi
-        world.export("world.xml")               # simpan definisi dunia ke XML
-        world2 = mcmr.World.load("world.xml")    # baca lagi -> World baru, bisa .run() lagi
+        sim = world.run(N=5000)                 # run the simulation
+        world.export("world.xml")               # save the world definition to XML
+        world2 = mcmr.World.load("world.xml")    # read it back -> new World, can .run() again
     """
 
     def __init__(self, x_world, y_world, x_grid, y_grid, material_matrix, sources,
@@ -25,9 +25,9 @@ class World:
         ny = len(material_matrix)
         nx = len(material_matrix[0]) if ny else 0
         if any(len(row) != nx for row in material_matrix):
-            raise ValueError("setiap baris material_matrix harus punya jumlah kolom yang sama")
+            raise ValueError("every row of material_matrix must have the same number of columns")
         if len(sources) != ny or any(len(row) != nx for row in sources):
-            raise ValueError("sources harus punya shape yang sama persis dengan material_matrix")
+            raise ValueError("sources must have the exact same shape as material_matrix")
 
         self.x_world = x_world
         self.y_world = y_world
@@ -41,20 +41,20 @@ class World:
         self.bc_right = bc_right
 
     # ------------------------------------------------------------------ #
-    # Jalankan simulasi
+    # Run simulation
     # ------------------------------------------------------------------ #
     def run(self, N, max_save=50):
-        """Jalankan simulasi Monte Carlo untuk dunia ini. Return objek Simulation (sudah di-.run()).
+        """Run the Monte Carlo simulation for this world. Returns a Simulation object (already .run()).
 
-        N        : jumlah partikel neutron yang disimulasikan
-        max_save : jumlah maksimum lintasan neutron yang disimpan untuk plotting
+        N        : number of neutron particles to simulate
+        max_save : maximum number of neutron trajectories saved for plotting
 
-        Konvensi index [row][col] material_matrix / sources: row=0 adalah baris
-        PALING ATAS (y tertinggi), col=0 adalah kolom PALING KIRI (x=0) -- ditulis
-        natural seperti menggambar grid di kertas.
+        [row][col] index convention for material_matrix / sources: row=0 is the
+        TOPMOST row (highest y), col=0 is the LEFTMOST column (x=0) -- written
+        naturally, like drawing a grid on paper.
 
-        bc_top, bc_bot, bc_left, bc_right : "vacuum" (neutron mati/leak) atau
-        "reflective" (neutron memantul balik, energi tetap).
+        bc_top, bc_bot, bc_left, bc_right : "vacuum" (neutron dies/leaks) or
+        "reflective" (neutron bounces back, energy unchanged).
         """
         from ._mcmr_cpp import Simulation
         from .cross_section import load_all_materials
@@ -69,12 +69,12 @@ class World:
         return sim
 
     # ------------------------------------------------------------------ #
-    # Simpan / baca ke XML
+    # Save / load to XML
     # ------------------------------------------------------------------ #
     def export(self, filename):
-        """Simpan dunia ini ke file XML (mcmr_world). Return filename yang ditulis.
+        """Save this world to an XML file (mcmr_world). Returns the filename written.
 
-        File ini TERPISAH dari XML hasil simulasi (mcmr_results.xml) -- 1 file = 1 informasi.
+        This file is SEPARATE from the simulation results XML (mcmr_results.xml) -- 1 file = 1 piece of information.
         """
         root = ET.Element("mcmr_world")
 
@@ -111,7 +111,7 @@ class World:
 
     @classmethod
     def load(cls, filename):
-        """Baca file XML hasil World.export(), kembalikan World baru."""
+        """Read the XML file produced by World.export(), return a new World."""
         tree = ET.parse(filename)
         root = tree.getroot()
 

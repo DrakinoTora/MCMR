@@ -7,7 +7,7 @@ namespace py = pybind11;
 PYBIND11_MODULE(_mcmr_cpp, m) {
     py::class_<Tally>(m, "Tally")
         .def_readonly("absorp_by_material", &Tally::absorp_by_material)
-        .def_readonly("transmisi", &Tally::transmisi)
+        .def_readonly("transmission", &Tally::transmission)
         .def_readonly("time_taken", &Tally::time_taken)
         .def_readonly("E_born", &Tally::E_born)
         .def_readonly("E_leak", &Tally::E_leak)

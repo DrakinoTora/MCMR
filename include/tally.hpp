@@ -6,7 +6,7 @@
 struct Tally {
     // neutron absorb per material
     std::map<std::string, int> absorp_by_material;
-    int transmisi = 0; // world leak
+    int transmission = 0; // world leak
     double time_taken = 0.0;
 
     std::vector<double> E_born;

@@ -22,7 +22,7 @@ TRAJECTORY_PALETTE = [
 
 
 class ResultsPlotter:
-    """Visualisasi lintasan neutron dari hasil simulasi MCMR."""
+    """Visualization of neutron trajectories from MCMR simulation results."""
 
     def __init__(self, xml_filename="mcmr_results.xml"):
         self.xml_filename = xml_filename
@@ -37,16 +37,16 @@ class ResultsPlotter:
     def plot_trajectories(self, world_xml=None, x_world=None, y_world=None,
                            x_grid=None, y_grid=None, material_matrix=None):
         """
-        Cara 1 (disarankan) -- baca grid dari file world XML hasil World.export(),
-        tidak perlu ketik ulang parameter apa pun:
+        Option 1 (recommended) -- read the grid from the world XML file produced by
+        World.export(), no need to retype any parameters:
             plotter.plot_trajectories(world_xml="world.xml")
 
-        Cara 2 (manual) -- oper parameter grid langsung. Parameter grid harus SAMA
-        PERSIS dengan yang dipakai saat world.run():
+        Option 2 (manual) -- pass the grid parameters directly. The grid parameters
+        must be EXACTLY the same as those used in world.run():
             plotter.plot_trajectories(x_world=..., y_world=..., x_grid=..., y_grid=..., material_matrix=...)
 
-        material_matrix : material_matrix[row][col], row=0 paling ATAS (y tertinggi),
-                           col=0 paling KIRI (x=0) -- sama seperti menulis grid di kertas.
+        material_matrix : material_matrix[row][col], row=0 is the TOPMOST row (highest y),
+                           col=0 is the LEFTMOST column (x=0) -- same as writing a grid on paper.
         """
         if world_xml is not None:
             w = World.load(world_xml)

@@ -38,7 +38,7 @@ Grid::Grid(double x_world, double y_world,
     int nx = static_cast<int>(x_edges.size()) - 1;
     int ny = static_cast<int>(y_edges.size()) - 1;
 
-    // Konvensi material_matrix[row][col]:
+    // material_matrix[row][col] convention:
     if (static_cast<int>(material_matrix.size()) != ny)
         throw std::invalid_argument(
             "material_matrix row count (" + std::to_string(material_matrix.size()) +
@@ -51,9 +51,9 @@ Grid::Grid(double x_world, double y_world,
                 "material_matrix row " + std::to_string(row) +
                 " col count must be same as len(x_grid)+1 = " + std::to_string(nx));
 
-        int iy = ny - 1 - row; // row atas (row=0) -> iy tertinggi
+        int iy = ny - 1 - row; // top row (row=0) -> highest iy
         for (int col = 0; col < nx; ++col) {
-            int ix = col; // col kiri (col=0) -> ix=0
+            int ix = col; // left col (col=0) -> ix=0
 
             Region r;
             r.x1 = x_edges[ix];

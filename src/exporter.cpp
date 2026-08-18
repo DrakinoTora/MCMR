@@ -10,7 +10,7 @@ void export_to_xml(const Tally& tally, const std::string& filename) {
     for (const auto& kv : tally.absorp_by_material) {
         f << "    <absorp material=\"" << kv.first << "\">" << kv.second << "</absorp>\n";
     }
-    f << "    <transmisi>" << tally.transmisi << "</transmisi>\n";
+    f << "    <transmission>" << tally.transmission << "</transmission>\n";
     f << "    <time_taken_seconds>" << tally.time_taken << "</time_taken_seconds>\n";
     f << "  </summary>\n";
     

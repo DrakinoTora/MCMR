@@ -42,7 +42,7 @@ public:
 
     const Region& region_at(int ix, int iy) const { return regions[ix][iy]; }
 
-    // d ke boundary; hit_side terisi kalau boundary yang tersentuh adalah tepi world
+    // distance to boundary; hit_side is set when the boundary hit is a world edge
     double distance_to_boundary(double x, double y, double mu_x, double mu_y,
                                  int ix, int iy, Side& hit_side) const;
 

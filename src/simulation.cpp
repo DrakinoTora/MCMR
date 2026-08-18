@@ -151,7 +151,7 @@ void Simulation::run() {
                     BoundaryType bc = grid.bc_for_side(hit_side);
 
                     if (bc == BoundaryType::Vacuum) {
-                        results.transmisi++;
+                        results.transmission++;
                         results.E_leak.push_back(E);
                         alive = false;
                         break;
