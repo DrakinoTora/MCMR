@@ -17,9 +17,13 @@ CSS/menggambar layer di atas layer.
 
 Grid (x_grid, y_grid) tidak perlu didefinisikan manual -- otomatis di-infer dari
 semua koordinat batas region yang pernah didaftarkan.
+
+geom.build() menghasilkan objek World -- sama persis dengan World yang dibuat
+manual. Dari situ jalurnya identik: world.run(N), world.export(filename), dst,
+tidak ada method terpisah untuk "hasil dari Geometry" vs "manual".
 """
 
-from .world import export_world
+from .world import World
 
 __all__ = ["Geometry"]
 
@@ -79,11 +83,13 @@ class Geometry:
         return self.add_region(0, y1, self.x_world, y2, material=material, source=source)
 
     # ------------------------------------------------------------------ #
-    # Build -> format yang dimengerti Simulation / load_and_run
+    # Build -> World
     # ------------------------------------------------------------------ #
     def build(self):
-        """Compile semua region menjadi (x_world, y_world, x_grid, y_grid,
-        material_matrix, sources) siap dipakai load_and_run() / Simulation().
+        """Compile semua region yang terdaftar menjadi objek World.
+
+        Return World -- jalur selanjutnya (world.run(N), world.export(filename))
+        identik dengan World yang dibuat manual.
         """
         x_edges = sorted(self._x_bounds)
         y_edges = sorted(self._y_bounds)
@@ -113,30 +119,10 @@ class Geometry:
         x_grid = x_edges[1:-1]  # buang 0 dan x_world -- itu batas internal saja
         y_grid = y_edges[1:-1]
 
-        return {
-            "x_world": self.x_world, "y_world": self.y_world,
-            "x_grid": x_grid, "y_grid": y_grid,
-            "material_matrix": material_matrix, "sources": sources,
-            "bc_top": self.bc_top, "bc_bot": self.bc_bot,
-            "bc_left": self.bc_left, "bc_right": self.bc_right,
-        }
-
-    # ------------------------------------------------------------------ #
-    # Convenience: langsung run / export tanpa harus tahu build()
-    # ------------------------------------------------------------------ #
-    def run(self, N, max_save=50):
-        """Compile geometry ini lalu langsung jalankan simulasi (mcmr.load_and_run)."""
-        from . import load_and_run  # lazy import, hindari circular import
-        return load_and_run(N=N, max_save=max_save, **self.build())
-
-    def to_world_xml(self, filename):
-        """Compile geometry ini lalu simpan sebagai file world XML (mcmr.export_world)."""
-        w = self.build()
-        return export_world(
-            filename,
-            x_world=w["x_world"], y_world=w["y_world"],
-            x_grid=w["x_grid"], y_grid=w["y_grid"],
-            material_matrix=w["material_matrix"], sources=w["sources"],
-            bc_top=w["bc_top"], bc_bot=w["bc_bot"],
-            bc_left=w["bc_left"], bc_right=w["bc_right"],
+        return World(
+            x_world=self.x_world, y_world=self.y_world,
+            x_grid=x_grid, y_grid=y_grid,
+            material_matrix=material_matrix, sources=sources,
+            bc_top=self.bc_top, bc_bot=self.bc_bot,
+            bc_left=self.bc_left, bc_right=self.bc_right,
         )

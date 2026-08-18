@@ -5,7 +5,7 @@ import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
-from .world import load_world
+from .world import World
 
 MATERIAL_COLORS = {
     "Fe": "#cfd8dc",
@@ -37,29 +37,22 @@ class ResultsPlotter:
     def plot_trajectories(self, world_xml=None, x_world=None, y_world=None,
                            x_grid=None, y_grid=None, material_matrix=None):
         """
-        Gambar lintasan neutron di atas peta material grid (kotak-kotak warna warni).
-
-        Cara 1 (disarankan) -- baca grid dari file world XML hasil mcmr.export_world(),
+        Cara 1 (disarankan) -- baca grid dari file world XML hasil World.export(),
         tidak perlu ketik ulang parameter apa pun:
             plotter.plot_trajectories(world_xml="world.xml")
 
-        Cara 2 (manual, untuk kompatibilitas lama) -- oper parameter grid langsung.
-        Parameter grid harus SAMA PERSIS dengan yang dipakai saat mcmr.load_and_run():
+        Cara 2 (manual) -- oper parameter grid langsung. Parameter grid harus SAMA
+        PERSIS dengan yang dipakai saat world.run():
             plotter.plot_trajectories(x_world=..., y_world=..., x_grid=..., y_grid=..., material_matrix=...)
 
         material_matrix : material_matrix[row][col], row=0 paling ATAS (y tertinggi),
                            col=0 paling KIRI (x=0) -- sama seperti menulis grid di kertas.
         """
         if world_xml is not None:
-            w = load_world(world_xml)
-            x_world, y_world = w["x_world"], w["y_world"]
-            x_grid, y_grid = w["x_grid"], w["y_grid"]
-            material_matrix = w["material_matrix"]
-        elif None in (x_world, y_world, x_grid, y_grid, material_matrix):
-            raise ValueError(
-                "beri world_xml=... (disarankan) ATAU semua dari "
-                "x_world, y_world, x_grid, y_grid, material_matrix secara manual"
-            )
+            w = World.load(world_xml)
+            x_world, y_world = w.x_world, w.y_world
+            x_grid, y_grid = w.x_grid, w.y_grid
+            material_matrix = w.material_matrix
 
         x_edges = [0.0] + list(x_grid) + [x_world]
         y_edges = [0.0] + list(y_grid) + [y_world]
