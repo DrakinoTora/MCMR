@@ -1,12 +1,14 @@
 # MCMR (Monte Carlo Multi-Region)
-MCMR is a high-performance C++ Monte Carlo Neutron Transport simulation library wrapped for Python using pybind11 and scikit-build-core. It simulates 2D neutron transport, scattering, absorption, and transmission across multi-region geometries ($Fe - Pb - Fe$) using both analog and non-analog (implicit capture with Russian Roulette) techniques.
+MCMR is a high-performance C++17 Monte Carlo Neutron Transport simulation library, wrapped for Python via pybind11 and scikit-build-core. It simulates 2D neutron transport, scattering, absorption, and transmission across multi-region geometries built from any combination of `Be`, `C`, `Fe`, and `Pb` regions, using both analog and non-analog (implicit capture with Russian Roulette) techniques.
 
 ## Features
-- High Performance: Core Monte Carlo tracking engine written in C++17.
-- Seamless Python Binding: Exposed directly to Python via pybind11.
-- Self-Contained Data: Internal nuclear cross-section HTML data parser (BeautifulSoup4 + pandas).
-- Cross-Section Interpolation: Fast linear interpolation for macroscopic cross-sections ($\Sigma_t$ and $\Sigma_s$).
-- Fission Energy Spectrum: Built-in Watt Fission Spectrum sampling.
+- **High Performance**: core Monte Carlo tracking engine written in C++17.
+- **Pythonic API**: `World` and a `Geometry` builder for defining regions, materials, and sources without hand-building grids/matrices; both feed into the same `Simulation` engine (exposed via pybind11).
+- **Flexible Boundary Conditions**: `vacuum` or `reflective`, set independently per side (top/bottom/left/right).
+- **Self-Contained Cross-Section Data**: built-in nuclear cross-section HTML data parser (BeautifulSoup4 + pandas), with fast linear interpolation for macroscopic cross-sections ($\Sigma_t$ and $\Sigma_s$).
+- **Fission Energy Spectrum**: built-in Watt Fission Spectrum sampling.
+- **XML Import/Export**: save a `World` definition and simulation results (particle tallies, trajectories) to XML, and reload a `World` later to re-run it.
+- **Trajectory Visualization**: `ResultsPlotter` renders neutron trajectories over the region geometry with matplotlib.
 
 ## Prerequisites
 Before building and installing the library, ensure you have the following installed on your system:
@@ -26,14 +28,14 @@ sudo apt install build-essential cmake python3-dev
 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/MCMR.git
+git clone https://github.com/DrakinoTora/MCMR.git
 cd MCMR
 ```
 
 2. Install Required Python Dependencies
 
 ```bash
-pip install scikit-build-core pybind11 pandas beautifulsoup4
+pip install scikit-build-core pybind11 pandas beautifulsoup4 matplotlib numpy
 ```
 
 3. Build and Install MCMR
@@ -42,18 +44,15 @@ pip install scikit-build-core pybind11 pandas beautifulsoup4
 pip install .
 ```
 
-## Usage in Python
-Once installed, you can import and run the mcmr library directly inside any Python script or Jupyter Notebook (.ipynb).
-
 ## Testing the Installation
 You can quickly verify that the library is installed properly by running the following command in your terminal:
 
 ```bash
-python3 -c "import mcmr; print(dir(mcmr))"
+python3 -c "import mcmr; print(mcmr.__all__)"
 ```
 
 Expected Output:
 
 ```plaintext
-['SimulationResult', '__all__', 'load_cross_section', 'neutron_sim', 'simpan_hasil_xml']
+['Tally', 'Simulation', 'ResultsPlotter', 'World', 'Geometry', 'load_all_materials', 'load_cross_section']
 ```
