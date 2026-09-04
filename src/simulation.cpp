@@ -16,6 +16,11 @@ Simulation::Simulation(int N, double x_world, double y_world,
                         const std::vector<double>& y_grid,
                         const std::vector<std::vector<std::string>>& material_matrix,
                         const std::vector<std::vector<double>>& sources,
+                        const std::vector<double>& circle_cx,
+                        const std::vector<double>& circle_cy,
+                        const std::vector<double>& circle_r,
+                        const std::vector<std::string>& circle_material,
+                        const std::vector<double>& circle_source,
                         int max_save,
                         const std::string& bc_top,
                         const std::string& bc_bot,
@@ -28,13 +33,22 @@ Simulation::Simulation(int N, double x_world, double y_world,
 
     int nx = grid.nx();
     int ny = grid.ny();
+    n_grid_cells = nx * ny;
 
     if (static_cast<int>(sources.size()) != ny)
         throw std::invalid_argument(
             "sources row count (" + std::to_string(sources.size()) +
             ") must be same as len(y_grid)+1 = " + std::to_string(ny));
 
-    flat_source_weights.resize(nx * ny);
+    int n_circles = static_cast<int>(circle_cx.size());
+    if (static_cast<int>(circle_cy.size()) != n_circles ||
+        static_cast<int>(circle_r.size()) != n_circles ||
+        static_cast<int>(circle_material.size()) != n_circles ||
+        static_cast<int>(circle_source.size()) != n_circles)
+        throw std::invalid_argument(
+            "circle_cx, circle_cy, circle_r, circle_material, circle_source must all have the same length");
+
+    flat_source_weights.resize(n_grid_cells + n_circles);
     double total = 0.0;
     for (int row = 0; row < ny; ++row) {
         if (static_cast<int>(sources[row].size()) != nx)
@@ -52,8 +66,19 @@ Simulation::Simulation(int N, double x_world, double y_world,
             total += w;
         }
     }
+
+    // register circles on the grid (true geometry, checked in Grid::add_circle) and
+    // append their source weight right after the grid cells in the same weight pool
+    for (int i = 0; i < n_circles; ++i) {
+        if (circle_source[i] < 0.0)
+            throw std::invalid_argument("circle source can't be negative value");
+        grid.add_circle(circle_cx[i], circle_cy[i], circle_r[i], circle_material[i]);
+        flat_source_weights[n_grid_cells + i] = circle_source[i];
+        total += circle_source[i];
+    }
+
     if (total <= 0.0)
-        throw std::invalid_argument("sum all sources must be greater than 0");
+        throw std::invalid_argument("sum of all sources (grid cells + circles) must be greater than 0");
 }
 
 void Simulation::set_cross_sections(
@@ -105,14 +130,32 @@ void Simulation::run() {
         }
 
         int flat_idx = region_picker(gen);
-        int ix = flat_idx / ny;
-        int iy = flat_idx % ny;
-        const Region& birth_region = grid.region_at(ix, iy);
+        double x, y;
 
-        std::uniform_real_distribution<double> dist_bx(birth_region.x1, birth_region.x2);
-        std::uniform_real_distribution<double> dist_by(birth_region.y1, birth_region.y2);
-        double x = dist_bx(gen);
-        double y = dist_by(gen);
+        if (flat_idx < n_grid_cells) {
+            // born inside a regular grid cell, uniform over its rectangle
+            int gix = flat_idx / ny;
+            int giy = flat_idx % ny;
+            const Region& birth_region = grid.region_at(gix, giy);
+
+            std::uniform_real_distribution<double> dist_bx(birth_region.x1, birth_region.x2);
+            std::uniform_real_distribution<double> dist_by(birth_region.y1, birth_region.y2);
+            x = dist_bx(gen);
+            y = dist_by(gen);
+        } else {
+            // born inside a circle source, uniform over its disk:
+            // r = R * sqrt(u), theta = uniform(0, 2*pi) -- keeps density uniform in area,
+            // NOT uniform in r (a naive r = R*u would bunch points near the center)
+            const CircleRegion& c = grid.circle_at_index(flat_idx - n_grid_cells);
+            double u = dist_R(gen);
+            double theta = dist_phi(gen);
+            double rr = c.r * std::sqrt(u);
+            x = c.cx + rr * std::cos(theta);
+            y = c.cy + rr * std::sin(theta);
+        }
+
+        int ix, iy;
+        grid.find_index(x, y, ix, iy);
 
         double phi = dist_phi(gen);
         double mu_x = std::cos(phi);
@@ -130,8 +173,7 @@ void Simulation::run() {
 
         bool alive = true;
         while (alive) {
-            const Region& cur_region = grid.region_at(ix, iy);
-            const MaterialInfo& cur_mat = cur_region.material;
+            const MaterialInfo& cur_mat = grid.material_at(x, y, ix, iy);
 
             double Sigma_t = Sigma_count(E_data_total.at(cur_mat.mat_code), Sig_data_total.at(cur_mat.mat_code), E);
             double Sigma_s = Sigma_count(E_data_scatter.at(cur_mat.mat_code), Sig_data_scatter.at(cur_mat.mat_code), E);

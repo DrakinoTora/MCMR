@@ -9,6 +9,14 @@ struct Region {
     MaterialInfo material;
 };
 
+// true circular region overlaid on top of the rectangular grid -- NOT tied to
+// any single grid cell, boundary is a real circle (checked via line-circle
+// intersection), not an approximation
+struct CircleRegion {
+    double cx, cy, r;
+    MaterialInfo material;
+};
+
 enum class BoundaryType { Vacuum, Reflective };
 enum class Side { None, Left, Right, Bottom, Top };
 
@@ -20,6 +28,7 @@ private:
     std::vector<double> x_edges;
     std::vector<double> y_edges;
     std::vector<std::vector<Region>> regions;
+    std::vector<CircleRegion> circles;  // painter's algorithm: later entries override earlier ones
 
     BoundaryType bc_left_, bc_right_, bc_bottom_, bc_top_;
 
@@ -42,7 +51,17 @@ public:
 
     const Region& region_at(int ix, int iy) const { return regions[ix][iy]; }
 
-    // distance to boundary; hit_side is set when the boundary hit is a world edge
+    // register a true circular region; throws if it doesn't fit entirely inside the world
+    void add_circle(double cx, double cy, double r, const std::string& material_name);
+    int num_circles() const { return static_cast<int>(circles.size()); }
+    const CircleRegion& circle_at_index(int i) const { return circles[i]; }
+
+    // actual material at a point, accounting for circles drawn on top of the grid cell
+    const MaterialInfo& material_at(double x, double y, int ix, int iy) const;
+
+    // distance to boundary; hit_side is set when the boundary hit is a world edge.
+    // Also checks every circle for a line-circle intersection along (mu_x, mu_y) --
+    // whichever event (rectangle edge or circle boundary) is closer wins.
     double distance_to_boundary(double x, double y, double mu_x, double mu_y,
                                  int ix, int iy, Side& hit_side) const;
 

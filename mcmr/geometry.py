@@ -21,6 +21,10 @@ automatically inferred from all region boundary coordinates ever registered.
 geom.build() produces a World object -- identical to a World built
 manually. From there the path is identical: world.run(N), world.export(filename),
 etc.; there's no separate method for "result from Geometry" vs "manual".
+
+geom.add_circle(x, y, r, material=..., source=...) uses the EXACT SAME method
+as World.add_circle() -- circles registered here are simply forwarded onto the
+World once build() is called, applied AFTER all rectangular regions.
 """
 
 from .world import World
@@ -47,6 +51,28 @@ class Geometry:
         self._ops = []  # list of dict(x1,y1,x2,y2,material,source), in call order
         self._x_bounds = {0.0, self.x_world}
         self._y_bounds = {0.0, self.y_world}
+        self._circles = []  # list of dict(cx, cy, r, material, source), applied after all regions
+
+    # ------------------------------------------------------------------ #
+    # Circle command -- forwarded to World.add_circle() at build() time
+    # ------------------------------------------------------------------ #
+    def add_circle(self, x, y, r, material, source=1):
+        """Register a true circular region, applied on top of all rectangular
+        regions once build() is called. Same validation and semantics as
+        World.add_circle() -- see its docstring for details.
+        """
+        if r <= 0:
+            raise ValueError("circle radius must be positive")
+        if not (0 <= x - r and x + r <= self.x_world and 0 <= y - r and y + r <= self.y_world):
+            raise ValueError(
+                f"circle at ({x}, {y}) with radius {r} goes outside world bounds "
+                f"[0, {self.x_world}] x [0, {self.y_world}]"
+            )
+        if source < 0:
+            raise ValueError("circle source can't be negative")
+
+        self._circles.append({"cx": x, "cy": y, "r": r, "material": material, "source": source})
+        return self  # chainable
 
     # ------------------------------------------------------------------ #
     # Region commands
@@ -119,10 +145,13 @@ class Geometry:
         x_grid = x_edges[1:-1]  # drop 0 and x_world -- those are internal boundaries only
         y_grid = y_edges[1:-1]
 
-        return World(
+        world = World(
             x_world=self.x_world, y_world=self.y_world,
             x_grid=x_grid, y_grid=y_grid,
             material_matrix=material_matrix, sources=sources,
             bc_top=self.bc_top, bc_bot=self.bc_bot,
             bc_left=self.bc_left, bc_right=self.bc_right,
         )
+        for c in self._circles:
+            world.add_circle(x=c["cx"], y=c["cy"], r=c["r"], material=c["material"], source=c["source"])
+        return world

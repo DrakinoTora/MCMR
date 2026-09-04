@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <limits>
+#include <cmath>
 
 BoundaryType parse_boundary_type(const std::string& name) {
     std::string s = name;
@@ -111,11 +112,66 @@ double Grid::distance_to_boundary(double x, double y, double mu_x, double mu_y,
         if (d < d_min) { d_min = d; hit_side = (iy == 0) ? Side::Bottom : Side::None; }
     }
 
+    // true circle boundary check: solve |(x,y) + t*(mu_x,mu_y) - (cx,cy)|^2 = r^2
+    // for t (quadratic line-circle intersection), NOT a nearest-point distance.
+    // (mu_x, mu_y) is a unit vector, so the quadratic's "a" coefficient is exactly 1.
+    const double circ_eps = 1e-9;
+    for (const auto& c : circles) {
+        double dx = x - c.cx;
+        double dy = y - c.cy;
+        double b = 2.0 * (dx * mu_x + dy * mu_y);
+        double cterm = dx * dx + dy * dy - c.r * c.r;
+        double disc = b * b - 4.0 * cterm;
+        if (disc < 0.0) continue;  // ray never touches this circle
+
+        double sq = std::sqrt(disc);
+        double t1 = (-b - sq) / 2.0;  // nearer intersection along the ray
+        double t2 = (-b + sq) / 2.0;  // farther intersection along the ray
+
+        // a circle boundary crossing is a material change, never a world edge
+        if (t1 > circ_eps && t1 < d_min) { d_min = t1; hit_side = Side::None; }
+        if (t2 > circ_eps && t2 < d_min) { d_min = t2; hit_side = Side::None; }
+    }
+
     if (d_min <= 0.0) {
         hit_side = Side::None;
         return 1e-6;
     }
     return d_min;
+}
+
+void Grid::add_circle(double cx, double cy, double r, const std::string& material_name) {
+    if (r <= 0.0)
+        throw std::invalid_argument("circle radius must be positive");
+
+    const double eps = 1e-9;
+    if (cx - r < -eps || cx + r > world_max_x() + eps ||
+        cy - r < -eps || cy + r > world_max_y() + eps) {
+        throw std::invalid_argument(
+            "circle centered at (" + std::to_string(cx) + ", " + std::to_string(cy) +
+            ") with radius " + std::to_string(r) + " goes outside world bounds [0, " +
+            std::to_string(world_max_x()) + "] x [0, " + std::to_string(world_max_y()) + "]");
+    }
+
+    CircleRegion c;
+    c.cx = cx;
+    c.cy = cy;
+    c.r = r;
+    c.material = get_material_info(material_name);
+    circles.push_back(c);
+}
+
+const MaterialInfo& Grid::material_at(double x, double y, int ix, int iy) const {
+    // check circles from last-registered to first -- later circles override earlier ones
+    // wherever they overlap (painter's algorithm), same convention as region ops in Python
+    for (int i = static_cast<int>(circles.size()) - 1; i >= 0; --i) {
+        double dx = x - circles[i].cx;
+        double dy = y - circles[i].cy;
+        if (dx * dx + dy * dy <= circles[i].r * circles[i].r) {
+            return circles[i].material;
+        }
+    }
+    return regions[ix][iy].material;
 }
 
 BoundaryType Grid::bc_for_side(Side s) const {

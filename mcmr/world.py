@@ -18,6 +18,12 @@ class World:
         sim = world.run(N=5000)                 # run the simulation
         world.export("world.xml")               # save the world definition to XML
         world2 = mcmr.World.load("world.xml")    # read it back -> new World, can .run() again
+
+    A world can also hold true circular regions, added on top of the rectangular
+    grid via add_circle(). These are real circles in the physics engine (checked
+    with an actual line-circle intersection, not a rasterized/pixelated approximation):
+
+        world.add_circle(x=25, y=25, r=5, material="C", source=1)
     """
 
     def __init__(self, x_world, y_world, x_grid, y_grid, material_matrix, sources,
@@ -39,6 +45,40 @@ class World:
         self.bc_bot = bc_bot
         self.bc_left = bc_left
         self.bc_right = bc_right
+        self.circles = []  # list of dict(cx, cy, r, material, source)
+
+    # ------------------------------------------------------------------ #
+    # Circles -- true geometry, drawn on top of the rectangular grid
+    # ------------------------------------------------------------------ #
+    def add_circle(self, x, y, r, material, source=1):
+        """Add a true circular region on top of this world.
+
+        This is real circular geometry in the physics engine (an actual
+        line-circle intersection is solved during transport) -- NOT a
+        rasterized/pixelated approximation made of small rectangles.
+
+        x, y     : center of the circle.
+        r        : radius. Must fit entirely inside the world bounds, or a
+                   ValueError is raised.
+        material : material name for inside the circle.
+        source   : neutron source weight for this circle (default 1). Use 0
+                   if this circle should not emit any neutrons.
+
+        Circles added later are drawn ON TOP of earlier circles wherever they
+        overlap (painter's algorithm) -- same convention as Geometry regions.
+        """
+        if r <= 0:
+            raise ValueError("circle radius must be positive")
+        if not (0 <= x - r and x + r <= self.x_world and 0 <= y - r and y + r <= self.y_world):
+            raise ValueError(
+                f"circle at ({x}, {y}) with radius {r} goes outside world bounds "
+                f"[0, {self.x_world}] x [0, {self.y_world}]"
+            )
+        if source < 0:
+            raise ValueError("circle source can't be negative")
+
+        self.circles.append({"cx": x, "cy": y, "r": r, "material": material, "source": source})
+        return self  # chainable
 
     # ------------------------------------------------------------------ #
     # Run simulation
@@ -59,9 +99,18 @@ class World:
         from ._mcmr_cpp import Simulation
         from .cross_section import load_all_materials
 
-        sim = Simulation(N, self.x_world, self.y_world, self.x_grid, self.y_grid,
-                          self.material_matrix, self.sources, max_save,
-                          self.bc_top, self.bc_bot, self.bc_left, self.bc_right)
+        sim = Simulation(
+            N=N, x_world=self.x_world, y_world=self.y_world,
+            x_grid=self.x_grid, y_grid=self.y_grid,
+            material_matrix=self.material_matrix, sources=self.sources,
+            circle_cx=[c["cx"] for c in self.circles],
+            circle_cy=[c["cy"] for c in self.circles],
+            circle_r=[c["r"] for c in self.circles],
+            circle_material=[c["material"] for c in self.circles],
+            circle_source=[c["source"] for c in self.circles],
+            max_history_save=max_save,
+            bc_top=self.bc_top, bc_bot=self.bc_bot, bc_left=self.bc_left, bc_right=self.bc_right,
+        )
         E_tot, Sig_tot, E_scat, Sig_scat = load_all_materials()
         sim.set_cross_sections(E_tot, Sig_tot, E_scat, Sig_scat)
 
@@ -104,6 +153,15 @@ class World:
             row_el.set("index", str(i))
             row_el.text = ",".join(map(str, row))
 
+        circles_el = ET.SubElement(root, "circles")
+        for c in self.circles:
+            c_el = ET.SubElement(circles_el, "circle")
+            c_el.set("cx", str(c["cx"]))
+            c_el.set("cy", str(c["cy"]))
+            c_el.set("r", str(c["r"]))
+            c_el.set("material", c["material"])
+            c_el.set("source", str(c["source"]))
+
         tree = ET.ElementTree(root)
         ET.indent(tree, space="  ")
         tree.write(filename, xml_declaration=True, encoding="UTF-8")
@@ -120,8 +178,8 @@ class World:
         y_world = float(dims.get("y_world"))
 
         grid_el = root.find("grid")
-        x_grid = [float(v) for v in grid_el.find("x_grid").text.split(",") if v]
-        y_grid = [float(v) for v in grid_el.find("y_grid").text.split(",") if v]
+        x_grid = [float(v) for v in (grid_el.find("x_grid").text or "").split(",") if v]
+        y_grid = [float(v) for v in (grid_el.find("y_grid").text or "").split(",") if v]
 
         bc_el = root.find("boundary")
         bc_top = bc_el.get("top", "vacuum")
@@ -132,9 +190,19 @@ class World:
         material_matrix = [row.text.split(",") for row in root.find("materials").findall("row")]
         sources = [[float(v) for v in row.text.split(",")] for row in root.find("sources").findall("row")]
 
-        return cls(
+        world = cls(
             x_world=x_world, y_world=y_world,
             x_grid=x_grid, y_grid=y_grid,
             material_matrix=material_matrix, sources=sources,
             bc_top=bc_top, bc_bot=bc_bot, bc_left=bc_left, bc_right=bc_right,
         )
+
+        circles_el = root.find("circles")
+        if circles_el is not None:
+            for c_el in circles_el.findall("circle"):
+                world.add_circle(
+                    x=float(c_el.get("cx")), y=float(c_el.get("cy")), r=float(c_el.get("r")),
+                    material=c_el.get("material"), source=float(c_el.get("source")),
+                )
+
+        return world

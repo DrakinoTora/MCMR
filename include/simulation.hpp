@@ -13,8 +13,10 @@ private:
     Grid grid;
     int max_history_save;
 
-    // weight probability born neutron
+    // weight probability born neutron -- indices [0, n_grid_cells) are grid cells,
+    // indices [n_grid_cells, n_grid_cells + n_circles) are circle sources
     std::vector<double> flat_source_weights;
+    int n_grid_cells = 0;
 
     std::map<int, std::vector<double>> E_data_total;
     std::map<int, std::vector<double>> Sig_data_total;
@@ -29,6 +31,11 @@ public:
            const std::vector<double>& y_grid,
            const std::vector<std::vector<std::string>>& material_matrix,
            const std::vector<std::vector<double>>& sources,
+           const std::vector<double>& circle_cx = {},
+           const std::vector<double>& circle_cy = {},
+           const std::vector<double>& circle_r = {},
+           const std::vector<std::string>& circle_material = {},
+           const std::vector<double>& circle_source = {},
            int max_save = 50,
            const std::string& bc_top   = "vacuum",
            const std::string& bc_bot   = "vacuum",
