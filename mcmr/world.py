@@ -50,35 +50,64 @@ class World:
     # ------------------------------------------------------------------ #
     # Circles -- true geometry, drawn on top of the rectangular grid
     # ------------------------------------------------------------------ #
-    def add_circle(self, x, y, r, material, source=1):
-        """Add a true circular region on top of this world.
+    def add_circles(self, radius_matrix, material_matrix, source_matrix=None):
+        """Add many circles at once, one per grid cell, using the SAME [row][col]
+        convention as this world's own material_matrix/sources (row=0 = topmost,
+        col=0 = leftmost). Each circle is automatically centered in the middle
+        of its grid cell -- internally this just calls add_circle() per cell,
+        same validation applies.
 
-        This is real circular geometry in the physics engine (an actual
-        line-circle intersection is solved during transport) -- NOT a
-        rasterized/pixelated approximation made of small rectangles.
+        radius_matrix   : must have the exact same shape as this world's
+                           material_matrix. A cell value of 0 (or any falsy
+                           value) means "no circle in this cell".
+        material_matrix : material name for each active cell (ignored where
+                           radius_matrix is 0).
+        source_matrix   : neutron source weight for each active cell.
+                           Optional -- defaults to 1 for every active cell.
 
-        x, y     : center of the circle.
-        r        : radius. Must fit entirely inside the world bounds, or a
-                   ValueError is raised.
-        material : material name for inside the circle.
-        source   : neutron source weight for this circle (default 1). Use 0
-                   if this circle should not emit any neutrons.
-
-        Circles added later are drawn ON TOP of earlier circles wherever they
-        overlap (painter's algorithm) -- same convention as Geometry regions.
+        A circle's radius can't exceed half of its own cell's shortest side
+        (otherwise it would stick out of the cell it's centered in) -- raises
+        ValueError naming the offending [row][col] if it does.
         """
-        if r <= 0:
-            raise ValueError("circle radius must be positive")
-        if not (0 <= x - r and x + r <= self.x_world and 0 <= y - r and y + r <= self.y_world):
-            raise ValueError(
-                f"circle at ({x}, {y}) with radius {r} goes outside world bounds "
-                f"[0, {self.x_world}] x [0, {self.y_world}]"
-            )
-        if source < 0:
-            raise ValueError("circle source can't be negative")
+        ny = len(self.material_matrix)
+        nx = len(self.material_matrix[0]) if ny else 0
 
-        self.circles.append({"cx": x, "cy": y, "r": r, "material": material, "source": source})
-        return self  # chainable
+        if len(radius_matrix) != ny or any(len(row) != nx for row in radius_matrix):
+            raise ValueError("radius_matrix must have the exact same shape as this world's material_matrix")
+        if len(material_matrix) != ny or any(len(row) != nx for row in material_matrix):
+            raise ValueError("material_matrix must have the exact same shape as this world's material_matrix")
+        if source_matrix is not None and (
+            len(source_matrix) != ny or any(len(row) != nx for row in source_matrix)
+        ):
+            raise ValueError("source_matrix must have the exact same shape as this world's material_matrix")
+
+        x_edges = [0.0] + list(self.x_grid) + [self.x_world]
+        y_edges = [0.0] + list(self.y_grid) + [self.y_world]
+
+        for row in range(ny):
+            cy1, cy2 = y_edges[ny - 1 - row], y_edges[ny - row]  # row=0 -> topmost -> highest y
+            cy = (cy1 + cy2) / 2
+            cell_h = cy2 - cy1
+            for col in range(nx):
+                r = radius_matrix[row][col]
+                if not r:
+                    continue
+
+                cx1, cx2 = x_edges[col], x_edges[col + 1]
+                cx = (cx1 + cx2) / 2
+                cell_w = cx2 - cx1
+
+                max_r = min(cell_w, cell_h) / 2
+                if r > max_r:
+                    raise ValueError(
+                        f"radius {r} at cell [row={row}][col={col}] exceeds half of its cell's "
+                        f"shortest side ({max_r}) -- the circle would stick out of its own cell"
+                    )
+
+                source = source_matrix[row][col] if source_matrix is not None else 1
+                self.add_circle(x=cx, y=cy, r=r, material=material_matrix[row][col], source=source)
+
+        return self
 
     # ------------------------------------------------------------------ #
     # Run simulation
