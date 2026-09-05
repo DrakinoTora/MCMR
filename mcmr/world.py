@@ -50,6 +50,36 @@ class World:
     # ------------------------------------------------------------------ #
     # Circles -- true geometry, drawn on top of the rectangular grid
     # ------------------------------------------------------------------ #
+    def add_circle(self, x, y, r, material, source=1):
+        """Add a true circular region on top of this world.
+
+        This is real circular geometry in the physics engine (an actual
+        line-circle intersection is solved during transport) -- NOT a
+        rasterized/pixelated approximation made of small rectangles.
+
+        x, y     : center of the circle.
+        r        : radius. Must fit entirely inside the world bounds, or a
+                   ValueError is raised.
+        material : material name for inside the circle.
+        source   : neutron source weight for this circle (default 1). Use 0
+                   if this circle should not emit any neutrons.
+
+        Circles added later are drawn ON TOP of earlier circles wherever they
+        overlap (painter's algorithm) -- same convention as Geometry regions.
+        """
+        if r <= 0:
+            raise ValueError("circle radius must be positive")
+        if not (0 <= x - r and x + r <= self.x_world and 0 <= y - r and y + r <= self.y_world):
+            raise ValueError(
+                f"circle at ({x}, {y}) with radius {r} goes outside world bounds "
+                f"[0, {self.x_world}] x [0, {self.y_world}]"
+            )
+        if source < 0:
+            raise ValueError("circle source can't be negative")
+
+        self.circles.append({"cx": x, "cy": y, "r": r, "material": material, "source": source})
+        return self  # chainable
+
     def add_circles(self, radius_matrix, material_matrix, source_matrix=None):
         """Add many circles at once, one per grid cell, using the SAME [row][col]
         convention as this world's own material_matrix/sources (row=0 = topmost,
