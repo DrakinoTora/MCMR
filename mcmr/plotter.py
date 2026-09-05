@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 
 import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Rectangle, Circle
 
 from .world import World
 
@@ -35,7 +35,7 @@ class ResultsPlotter:
         return MATERIAL_COLORS[name]
 
     def plot_trajectories(self, world_xml=None, x_world=None, y_world=None,
-                           x_grid=None, y_grid=None, material_matrix=None):
+                           x_grid=None, y_grid=None, material_matrix=None, circles=None):
         """
         Option 1 (recommended) -- read the grid from the world XML file produced by
         World.export(), no need to retype any parameters:
@@ -43,16 +43,26 @@ class ResultsPlotter:
 
         Option 2 (manual) -- pass the grid parameters directly. The grid parameters
         must be EXACTLY the same as those used in world.run():
-            plotter.plot_trajectories(x_world=..., y_world=..., x_grid=..., y_grid=..., material_matrix=...)
+            plotter.plot_trajectories(x_world=..., y_world=..., x_grid=..., y_grid=..., material_matrix=..., circles=...)
 
         material_matrix : material_matrix[row][col], row=0 is the TOPMOST row (highest y),
                            col=0 is the LEFTMOST column (x=0) -- same as writing a grid on paper.
+        circles         : list of dict(cx, cy, r, material, ...), same shape as World.circles.
+                           Drawn on top of the rectangular grid, same as the physics engine.
+                           Only used in Option 2 -- Option 1 reads it from world_xml automatically.
         """
         if world_xml is not None:
             w = World.load(world_xml)
             x_world, y_world = w.x_world, w.y_world
             x_grid, y_grid = w.x_grid, w.y_grid
             material_matrix = w.material_matrix
+            circles = w.circles
+        elif None in (x_world, y_world, x_grid, y_grid, material_matrix):
+            raise ValueError(
+                "give world_xml=... (recommended) OR all of "
+                "x_world, y_world, x_grid, y_grid, material_matrix manually"
+            )
+        circles = circles or []
 
         x_edges = [0.0] + list(x_grid) + [x_world]
         y_edges = [0.0] + list(y_grid) + [y_world]
@@ -61,7 +71,7 @@ class ResultsPlotter:
 
         fig, ax = plt.subplots(figsize=(8, 7))
 
-        # background
+        # background (rectangular grid)
         drawn_materials = {}
         for row in range(ny):
             iy = ny - 1 - row
@@ -76,6 +86,17 @@ class ResultsPlotter:
                     facecolor=color, zorder=0,
                 ))
                 drawn_materials[mat] = color
+
+        # circular regions -- drawn on top of the rectangular grid, same as the
+        # physics engine (painter's algorithm: later circles override earlier ones)
+        for c in circles:
+            mat = c["material"]
+            color = self._material_color(mat)
+            ax.add_patch(Circle(
+                (c["cx"], c["cy"]), c["r"],
+                facecolor=color, edgecolor="black", linewidth=0.6, zorder=1,
+            ))
+            drawn_materials[mat] = color
 
         # neutron track
         histories = self.root.findall(".//particle_history")
