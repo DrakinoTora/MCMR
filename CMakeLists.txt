@@ -14,6 +14,7 @@ set(MCMR_SOURCES
     src/tally.cpp
     src/exporter.cpp
     src/simulation.cpp
+    src/simulation_mg.cpp
     src/main.cpp
 )
 

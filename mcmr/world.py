@@ -142,11 +142,18 @@ class World:
     # ------------------------------------------------------------------ #
     # Run simulation
     # ------------------------------------------------------------------ #
-    def run(self, N, max_save=50):
-        """Run the Monte Carlo simulation for this world. Returns a Simulation object (already .run()).
+    def run(self, N, max_save=50, mode="continuous", group_materials=None):
+        """Run the Monte Carlo simulation for this world. Returns a Simulation
+        (or SimulationMG) object, already .run().
 
         N        : number of neutron particles to simulate
         max_save : maximum number of neutron trajectories saved for plotting
+        mode     : "continuous" (default, unchanged behavior -- Watt spectrum
+                   birth + interpolated continuous cross sections) or "group"
+                   (discretized energy -- see group_materials below).
+        group_materials : required when mode="group". A mcmr.MaterialLibrary
+                   holding a mcmr.GroupMaterial for every material name used
+                   in this world's material_matrix / circles.
 
         [row][col] index convention for material_matrix / sources: row=0 is the
         TOPMOST row (highest y), col=0 is the LEFTMOST column (x=0) -- written
@@ -155,6 +162,14 @@ class World:
         bc_top, bc_bot, bc_left, bc_right : "vacuum" (neutron dies/leaks) or
         "reflective" (neutron bounces back, energy unchanged).
         """
+        if mode not in ("continuous", "group"):
+            raise ValueError(f"mode must be 'continuous' or 'group', got {mode!r}")
+
+        if mode == "continuous":
+            return self._run_continuous(N, max_save)
+        return self._run_group(N, max_save, group_materials)
+
+    def _run_continuous(self, N, max_save):
         from ._mcmr_cpp import Simulation
         from .cross_section import load_all_materials
 
@@ -173,6 +188,45 @@ class World:
         E_tot, Sig_tot, E_scat, Sig_scat = load_all_materials()
         sim.set_cross_sections(E_tot, Sig_tot, E_scat, Sig_scat)
 
+        sim.run()
+        return sim
+
+    def _run_group(self, N, max_save, group_materials):
+        from ._mcmr_cpp import SimulationMG
+
+        if group_materials is None:
+            raise ValueError("mode='group' requires group_materials=<a MaterialLibrary>")
+
+        # every material name actually used in this world must be in the library.
+        # Names must match EXACTLY (same canonical spelling: Be, C, Fe, Pb) --
+        # see the note in GroupMaterial's docstring.
+        used_names = {name for row in self.material_matrix for name in row}
+        used_names |= {c["material"] for c in self.circles}
+        missing = [n for n in used_names if n not in group_materials]
+        if missing:
+            raise ValueError(f"group_materials is missing data for: {', '.join(sorted(missing))}")
+
+        sigma_t, sigma_s, sigma_f, nu = {}, {}, {}, {}
+        for name in used_names:
+            gm = group_materials[name]
+            sigma_t[name] = gm.sigma_t
+            sigma_s[name] = gm.sigma_s
+            sigma_f[name] = gm.sigma_f
+            nu[name] = gm.nu
+
+        sim = SimulationMG(
+            N=N, x_world=self.x_world, y_world=self.y_world,
+            x_grid=self.x_grid, y_grid=self.y_grid,
+            material_matrix=self.material_matrix, sources=self.sources,
+            circle_cx=[c["cx"] for c in self.circles],
+            circle_cy=[c["cy"] for c in self.circles],
+            circle_r=[c["r"] for c in self.circles],
+            circle_material=[c["material"] for c in self.circles],
+            circle_source=[c["source"] for c in self.circles],
+            max_history_save=max_save,
+            bc_top=self.bc_top, bc_bot=self.bc_bot, bc_left=self.bc_left, bc_right=self.bc_right,
+        )
+        sim.set_group_data(group_materials.n_groups, sigma_t, sigma_s, sigma_f, nu)
         sim.run()
         return sim
 

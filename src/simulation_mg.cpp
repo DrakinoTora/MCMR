@@ -1,0 +1,279 @@
+#include "simulation_mg.hpp"
+#include "physics.hpp"
+#include "exporter.hpp"
+#include <chrono>
+#include <cmath>
+#include <random>
+#include <iomanip>
+#include <sstream>
+#include <stdexcept>
+
+#include <pybind11/pybind11.h>
+namespace py = pybind11;
+
+SimulationMG::SimulationMG(int N, double x_world, double y_world,
+                        const std::vector<double>& x_grid,
+                        const std::vector<double>& y_grid,
+                        const std::vector<std::vector<std::string>>& material_matrix,
+                        const std::vector<std::vector<double>>& sources,
+                        const std::vector<double>& circle_cx,
+                        const std::vector<double>& circle_cy,
+                        const std::vector<double>& circle_r,
+                        const std::vector<std::string>& circle_material,
+                        const std::vector<double>& circle_source,
+                        int max_save,
+                        const std::string& bc_top,
+                        const std::string& bc_bot,
+                        const std::string& bc_left,
+                        const std::string& bc_right)
+    : N_particles(N),
+      grid(x_world, y_world, x_grid, y_grid, material_matrix,
+           bc_left, bc_right, bc_bot, bc_top),
+      max_history_save(max_save) {
+
+    // -- geometry / source setup: identical logic to Simulation's constructor --
+    int nx = grid.nx();
+    int ny = grid.ny();
+    n_grid_cells = nx * ny;
+
+    if (static_cast<int>(sources.size()) != ny)
+        throw std::invalid_argument(
+            "sources row count (" + std::to_string(sources.size()) +
+            ") must be same as len(y_grid)+1 = " + std::to_string(ny));
+
+    int n_circles = static_cast<int>(circle_cx.size());
+    if (static_cast<int>(circle_cy.size()) != n_circles ||
+        static_cast<int>(circle_r.size()) != n_circles ||
+        static_cast<int>(circle_material.size()) != n_circles ||
+        static_cast<int>(circle_source.size()) != n_circles)
+        throw std::invalid_argument(
+            "circle_cx, circle_cy, circle_r, circle_material, circle_source must all have the same length");
+
+    flat_source_weights.resize(n_grid_cells + n_circles);
+    double total = 0.0;
+    for (int row = 0; row < ny; ++row) {
+        if (static_cast<int>(sources[row].size()) != nx)
+            throw std::invalid_argument(
+                "sources row " + std::to_string(row) +
+                " col count must be same as len(x_grid)+1 = " + std::to_string(nx));
+
+        int iy = ny - 1 - row;
+        for (int col = 0; col < nx; ++col) {
+            int ix = col;
+            double w = sources[row][col];
+            if (w < 0.0)
+                throw std::invalid_argument("sources can't be negative value");
+            flat_source_weights[ix * ny + iy] = w;
+            total += w;
+        }
+    }
+
+    for (int i = 0; i < n_circles; ++i) {
+        if (circle_source[i] < 0.0)
+            throw std::invalid_argument("circle source can't be negative value");
+        grid.add_circle(circle_cx[i], circle_cy[i], circle_r[i], circle_material[i]);
+        flat_source_weights[n_grid_cells + i] = circle_source[i];
+        total += circle_source[i];
+    }
+
+    if (total <= 0.0)
+        throw std::invalid_argument("sum of all sources (grid cells + circles) must be greater than 0");
+}
+
+void SimulationMG::set_group_data(
+    int n_groups_,
+    const std::map<std::string, std::vector<double>>& sigma_t_,
+    const std::map<std::string, std::vector<double>>& sigma_s_,
+    const std::map<std::string, std::vector<double>>& sigma_f_,
+    const std::map<std::string, std::vector<double>>& nu_
+) {
+    if (n_groups_ <= 0)
+        throw std::invalid_argument("n_groups must be positive");
+
+    for (const auto& kv : sigma_t_) {
+        const std::string& name = kv.first;
+        if (static_cast<int>(kv.second.size()) != n_groups_)
+            throw std::invalid_argument("sigma_t for material '" + name +
+                                         "' must have exactly n_groups elements");
+        if (!sigma_s_.count(name) || static_cast<int>(sigma_s_.at(name).size()) != n_groups_)
+            throw std::invalid_argument("sigma_s missing or wrong length for material '" + name + "'");
+
+        const auto& st = kv.second;
+        const auto& ss = sigma_s_.at(name);
+        std::vector<double> sf(n_groups_, 0.0);
+        if (sigma_f_.count(name)) {
+            if (static_cast<int>(sigma_f_.at(name).size()) != n_groups_)
+                throw std::invalid_argument("sigma_f wrong length for material '" + name + "'");
+            sf = sigma_f_.at(name);
+        }
+        for (int g = 0; g < n_groups_; ++g) {
+            if (ss[g] + sf[g] > st[g] + 1e-12)
+                throw std::invalid_argument("sigma_s + sigma_f exceeds sigma_t at group " + std::to_string(g) +
+                                             " for material '" + name + "'");
+        }
+    }
+
+    n_groups = n_groups_;
+    sigma_t = sigma_t_;
+    sigma_s = sigma_s_;
+    sigma_f = sigma_f_;
+    nu = nu_;
+}
+
+void SimulationMG::run() {
+    if (n_groups <= 0)
+        throw std::invalid_argument("set_group_data() must be called before run()");
+
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<double> dist_R(0.0, 1.0);
+    std::uniform_real_distribution<double> dist_phi(0.0, 2.0 * M_PI);
+    std::discrete_distribution<int> region_picker(flat_source_weights.begin(), flat_source_weights.end());
+    std::uniform_int_distribution<int> dist_g0(0, n_groups - 1);
+
+    py::print("====================================================");
+    py::print(" MCMR Simulation Engine (multi-group)");
+    py::print(" Total Particle   :", N_particles);
+    py::print(" Number of Groups :", n_groups);
+    py::print("====================================================");
+    py::print("running...");
+    py::module_::import("sys").attr("stdout").attr("flush")();
+
+    int nx = grid.nx();
+    int ny = grid.ny();
+
+    int step_update = N_particles / 100;
+    if (step_update < 1) step_update = 1;
+
+    for (int p = 0; p < N_particles; ++p) {
+        if ((p + 1) % step_update == 0 || p == N_particles - 1) {
+            int current = p + 1;
+            int percent = (current * 100) / N_particles;
+
+            std::stringstream ss;
+            ss << "\rProgress: [" << current << "/" << N_particles << "] (" << percent << "%)";
+
+            py::print(ss.str(), py::arg("end") = "");
+            py::module_::import("sys").attr("stdout").attr("flush")();
+        }
+
+        bool save_history = p < max_history_save;
+        std::vector<double> h_x, h_y;
+
+        int flat_idx = region_picker(gen);
+        double x, y;
+        int ix, iy;
+
+        if (flat_idx < n_grid_cells) {
+            ix = flat_idx / ny;
+            iy = flat_idx % ny;
+            const Region& r = grid.region_at(ix, iy);
+            x = r.x1 + dist_R(gen) * (r.x2 - r.x1);
+            y = r.y1 + dist_R(gen) * (r.y2 - r.y1);
+        } else {
+            const CircleRegion& c = grid.circle_at_index(flat_idx - n_grid_cells);
+            double u = dist_R(gen);
+            double theta = dist_phi(gen);
+            double rr = c.r * std::sqrt(u); // uniform over the disk area, see region-sampling note
+            x = c.cx + rr * std::cos(theta);
+            y = c.cy + rr * std::sin(theta);
+            grid.find_index(x, y, ix, iy);
+        }
+
+        double phi = dist_phi(gen);
+        double mu_x = std::cos(phi);
+        double mu_y = std::sin(phi);
+        int g = dist_g0(gen); // group born uniformly
+
+        if (save_history) { h_x.push_back(x); h_y.push_back(y); }
+
+        bool alive = true;
+        while (alive) {
+            const MaterialInfo& cur_mat = grid.material_at(x, y, ix, iy);
+            const auto& st = sigma_t.at(cur_mat.symbol);
+            const auto& ss = sigma_s.at(cur_mat.symbol);
+            const auto& sf = sigma_f.at(cur_mat.symbol);
+
+            double Sigma_t = st[g];
+            double Sigma_s = ss[g];
+            double Sigma_f = sf[g];
+            double Sigma_a = Sigma_t - Sigma_s - Sigma_f; // pure capture
+
+            double R = dist_R(gen);
+            double d_coll = -std::log(R) / Sigma_t;
+
+            Side hit_side;
+            double d_surf = grid.distance_to_boundary(x, y, mu_x, mu_y, ix, iy, hit_side);
+
+            double d = std::min(d_coll, d_surf);
+            x += d * mu_x;
+            y += d * mu_y;
+
+            if (d_coll >= d_surf) {
+                if (hit_side != Side::None) {
+                    BoundaryType bc = grid.bc_for_side(hit_side);
+                    if (bc == BoundaryType::Vacuum) {
+                        results.transmission++;
+                        alive = false;
+                        break;
+                    } else {
+                        if (hit_side == Side::Left || hit_side == Side::Right) mu_x = -mu_x;
+                        else mu_y = -mu_y;
+                        if (save_history) { h_x.push_back(x); h_y.push_back(y); }
+                        continue;
+                    }
+                }
+                x += 1e-6 * mu_x;
+                y += 1e-6 * mu_y;
+                grid.find_index(x, y, ix, iy);
+                continue;
+            }
+
+            if (save_history) { h_x.push_back(x); h_y.push_back(y); }
+
+            // pick event by slicing [0, Sigma_t) into scatter / capture / fission
+            double P = dist_R(gen) * Sigma_t;
+            if (P < Sigma_s) {
+                // isotropic scatter, down-scatter only: new group uniform in [0, g]
+                phi = dist_phi(gen);
+                mu_x = std::cos(phi);
+                mu_y = std::sin(phi);
+                std::uniform_int_distribution<int> dist_newg(0, g);
+                g = dist_newg(gen);
+            } else if (P < Sigma_s + Sigma_a) {
+                alive = false;
+                results.absorp_by_material[cur_mat.symbol]++;
+            } else {
+                // fission branch: particle dies here, no neutron multiplication yet
+                // (sample_fission_neutrons() in physics.hpp is ready for when this
+                // is switched on) -- tallied separately from pure absorption
+                alive = false;
+                results.fission_by_material[cur_mat.symbol]++;
+            }
+        }
+
+        if (save_history) {
+            results.x_history.push_back(h_x);
+            results.y_history.push_back(h_y);
+        }
+    }
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diff = end_time - start_time;
+    results.time_taken = diff.count();
+
+    py::print("\n====================================================");
+    std::stringstream ss_end;
+    ss_end << " Simulation End in " << std::fixed << std::setprecision(4) << results.time_taken << " seconds.";
+    py::print(ss_end.str());
+    py::print("====================================================\n");
+    py::module_::import("sys").attr("stdout").attr("flush")();
+
+    export_xml();
+}
+
+void SimulationMG::export_xml(const std::string& filename) {
+    export_to_xml(results, filename);
+}

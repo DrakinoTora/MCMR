@@ -30,6 +30,13 @@ double E_scatter(double E, double alpha, double phi) {
     return E * ((1.0 + alpha) + (1.0 - alpha) * std::cos(phi)) / 2.0;
 }
 
+int sample_fission_neutrons(double nu) {
+    int base = static_cast<int>(std::floor(nu));
+    double frac = nu - static_cast<double>(base);
+    std::uniform_real_distribution<double> dist_R(0.0, 1.0);
+    return (dist_R(gen) < frac) ? base + 1 : base;
+}
+
 double Sigma_count(const std::vector<double>& E_data, const std::vector<double>& Sig_data, double E_target) {
     if (E_data.empty()) return 0.1;
     if (E_target <= E_data.front()) return Sig_data.front();
