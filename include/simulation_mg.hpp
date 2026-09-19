@@ -2,7 +2,9 @@
 #include "region.hpp"
 #include "material.hpp"
 #include "tally.hpp"
+#include <deque>
 #include <map>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -13,12 +15,23 @@
 //   - sigma_t / sigma_s / sigma_f: direct per-group lookup, no interpolation
 //   - scatter: isotropic direction, new group sampled uniform over [0, g]
 //     (down-scatter only -- group 0 = fastest, higher index = lower energy)
-//   - fission: sigma_f only subtracts from sigma_a for now (particle is
-//     absorbed there, tallied separately in fission_by_material); no neutron
-//     multiplication yet -- sample_fission_neutrons() in physics.hpp is ready
-//     for when that's switched on.
+//   - fission: the parent dies (tallied in fission_by_material) and
+//     sample_fission_neutrons(nu[g]) children are pushed into fission_bank:
+//     same position and same group as the parent, each with its own
+//     isotropic direction. run() never starts the next source particle
+//     while the bank is not empty -- it transports the banked neutrons
+//     first (exactly like any other neutron; a fission there just appends
+//     more members to the same bank). A supercritical setup therefore never
+//     finishes, which is why run() prints the bank size next to the progress.
 class SimulationMG {
 private:
+    // neutron born from fission, waiting in fission_bank to be transported
+    struct BankedNeutron {
+        double x, y;
+        double mu_x, mu_y;
+        int g;
+    };
+
     int N_particles;
     Grid grid;
     int max_history_save;
@@ -33,7 +46,15 @@ private:
     std::map<std::string, std::vector<double>> sigma_f;
     std::map<std::string, std::vector<double>> nu;
 
+    std::deque<BankedNeutron> fission_bank;  // FIFO queue
+
     Tally results;
+
+    // transport ONE neutron until it dies (leak / capture / fission).
+    // h_x / h_y: trajectory is recorded into them, pass nullptr to not record.
+    void transport_one(double x, double y, double mu_x, double mu_y, int g, int ix, int iy,
+                       std::mt19937& gen,
+                       std::vector<double>* h_x, std::vector<double>* h_y);
 
 public:
     SimulationMG(int N, double x_world, double y_world,

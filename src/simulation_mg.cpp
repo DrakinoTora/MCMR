@@ -90,6 +90,10 @@ void SimulationMG::set_group_data(
     if (n_groups_ <= 0)
         throw std::invalid_argument("n_groups must be positive");
 
+    // sigma_f and nu are optional per material: a material missing from those maps
+    // gets zeros (no fission), so run() can always index them by material symbol
+    std::map<std::string, std::vector<double>> sf_full, nu_full;
+
     for (const auto& kv : sigma_t_) {
         const std::string& name = kv.first;
         if (static_cast<int>(kv.second.size()) != n_groups_)
@@ -100,24 +104,118 @@ void SimulationMG::set_group_data(
 
         const auto& st = kv.second;
         const auto& ss = sigma_s_.at(name);
+
         std::vector<double> sf(n_groups_, 0.0);
         if (sigma_f_.count(name)) {
             if (static_cast<int>(sigma_f_.at(name).size()) != n_groups_)
                 throw std::invalid_argument("sigma_f wrong length for material '" + name + "'");
             sf = sigma_f_.at(name);
         }
+
+        std::vector<double> nu_m(n_groups_, 0.0);
+        if (nu_.count(name)) {
+            if (static_cast<int>(nu_.at(name).size()) != n_groups_)
+                throw std::invalid_argument("nu wrong length for material '" + name + "'");
+            nu_m = nu_.at(name);
+        }
+
         for (int g = 0; g < n_groups_; ++g) {
             if (ss[g] + sf[g] > st[g] + 1e-12)
                 throw std::invalid_argument("sigma_s + sigma_f exceeds sigma_t at group " + std::to_string(g) +
                                              " for material '" + name + "'");
+            if (nu_m[g] < 0.0)
+                throw std::invalid_argument("nu can't be negative at group " + std::to_string(g) +
+                                             " for material '" + name + "'");
         }
+
+        sf_full[name] = sf;
+        nu_full[name] = nu_m;
     }
 
     n_groups = n_groups_;
     sigma_t = sigma_t_;
     sigma_s = sigma_s_;
-    sigma_f = sigma_f_;
-    nu = nu_;
+    sigma_f = sf_full;
+    nu = nu_full;
+}
+
+void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, int g, int ix, int iy,
+                                 std::mt19937& gen,
+                                 std::vector<double>* h_x, std::vector<double>* h_y) {
+    std::uniform_real_distribution<double> dist_R(0.0, 1.0);
+    std::uniform_real_distribution<double> dist_phi(0.0, 2.0 * M_PI);
+    const bool save_history = (h_x != nullptr && h_y != nullptr);
+
+    bool alive = true;
+    while (alive) {
+        const MaterialInfo& cur_mat = grid.material_at(x, y, ix, iy);
+        const auto& st = sigma_t.at(cur_mat.symbol);
+        const auto& ss = sigma_s.at(cur_mat.symbol);
+        const auto& sf = sigma_f.at(cur_mat.symbol);
+
+        double Sigma_t = st[g];
+        double Sigma_s = ss[g];
+        double Sigma_f = sf[g];
+        double Sigma_a = Sigma_t - Sigma_s - Sigma_f; // pure capture
+
+        double R = dist_R(gen);
+        double d_coll = -std::log(R) / Sigma_t;
+
+        Side hit_side;
+        double d_surf = grid.distance_to_boundary(x, y, mu_x, mu_y, ix, iy, hit_side);
+
+        double d = std::min(d_coll, d_surf);
+        x += d * mu_x;
+        y += d * mu_y;
+
+        if (d_coll >= d_surf) {
+            if (hit_side != Side::None) {
+                BoundaryType bc = grid.bc_for_side(hit_side);
+                if (bc == BoundaryType::Vacuum) {
+                    results.transmission++;
+                    alive = false;
+                    break;
+                } else {
+                    if (hit_side == Side::Left || hit_side == Side::Right) mu_x = -mu_x;
+                    else mu_y = -mu_y;
+                    if (save_history) { h_x->push_back(x); h_y->push_back(y); }
+                    continue;
+                }
+            }
+            x += 1e-6 * mu_x;
+            y += 1e-6 * mu_y;
+            grid.find_index(x, y, ix, iy);
+            continue;
+        }
+
+        if (save_history) { h_x->push_back(x); h_y->push_back(y); }
+
+        // pick event by slicing [0, Sigma_t) into scatter / capture / fission
+        double P = dist_R(gen) * Sigma_t;
+        if (P < Sigma_s) {
+            // isotropic scatter, down-scatter only: new group uniform in [0, g]
+            double phi = dist_phi(gen);
+            mu_x = std::cos(phi);
+            mu_y = std::sin(phi);
+            std::uniform_int_distribution<int> dist_newg(0, g);
+            g = dist_newg(gen);
+        } else if (P < Sigma_s + Sigma_a) {
+            alive = false;
+            results.absorp_by_material[cur_mat.symbol]++;
+        } else {
+            // fission: the parent dies here, its children go into the fission bank.
+            // position = parent's position, group = parent's group,
+            // direction = a fresh isotropic direction for EACH child
+            alive = false;
+            results.fission_by_material[cur_mat.symbol]++;
+
+            int n_children = sample_fission_neutrons(nu.at(cur_mat.symbol)[g]);
+            for (int k = 0; k < n_children; ++k) {
+                double child_phi = dist_phi(gen);
+                fission_bank.push_back({x, y, std::cos(child_phi), std::sin(child_phi), g});
+            }
+        }
+    }
 }
 
 void SimulationMG::run() {
@@ -125,6 +223,8 @@ void SimulationMG::run() {
         throw std::invalid_argument("set_group_data() must be called before run()");
 
     auto start_time = std::chrono::high_resolution_clock::now();
+
+    fission_bank.clear();  // an interrupted earlier run() must not leak neutrons into this one
 
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -141,23 +241,34 @@ void SimulationMG::run() {
     py::print("running...");
     py::module_::import("sys").attr("stdout").attr("flush")();
 
-    int nx = grid.nx();
-    int ny = grid.ny();
+    const int ny = grid.ny();
 
-    int step_update = N_particles / 100;
-    if (step_update < 1) step_update = 1;
+    // Progress line: [source particle in progress / N] + current fission bank size.
+    // Throttled by time (not by particle count) because a supercritical run can sit on ONE
+    // source particle forever -- the bank size is what tells the user that is happening.
+    auto last_print = std::chrono::steady_clock::now();
+    auto print_progress = [&](int current, bool force) {
+        auto now = std::chrono::steady_clock::now();
+        if (!force && now - last_print < std::chrono::milliseconds(100)) return;
+        last_print = now;
+
+        // lets Ctrl+C / "Interrupt kernel" stop a run that never ends
+        if (PyErr_CheckSignals() != 0) throw py::error_already_set();
+
+        int percent = N_particles > 0
+            ? static_cast<int>(static_cast<long long>(current) * 100 / N_particles)
+            : 100;
+
+        std::stringstream ss;
+        ss << "\rProgress: [" << current << "/" << N_particles << "] (" << percent << "%)"
+           << " | Fission bank: " << fission_bank.size() << "      ";  // trailing spaces wipe a longer old line
+
+        py::print(ss.str(), py::arg("end") = "");
+        py::module_::import("sys").attr("stdout").attr("flush")();
+    };
 
     for (int p = 0; p < N_particles; ++p) {
-        if ((p + 1) % step_update == 0 || p == N_particles - 1) {
-            int current = p + 1;
-            int percent = (current * 100) / N_particles;
-
-            std::stringstream ss;
-            ss << "\rProgress: [" << current << "/" << N_particles << "] (" << percent << "%)";
-
-            py::print(ss.str(), py::arg("end") = "");
-            py::module_::import("sys").attr("stdout").attr("flush")();
-        }
+        print_progress(p + 1, p == 0);
 
         bool save_history = p < max_history_save;
         std::vector<double> h_x, h_y;
@@ -189,76 +300,32 @@ void SimulationMG::run() {
 
         if (save_history) { h_x.push_back(x); h_y.push_back(y); }
 
-        bool alive = true;
-        while (alive) {
-            const MaterialInfo& cur_mat = grid.material_at(x, y, ix, iy);
-            const auto& st = sigma_t.at(cur_mat.symbol);
-            const auto& ss = sigma_s.at(cur_mat.symbol);
-            const auto& sf = sigma_f.at(cur_mat.symbol);
+        transport_one(x, y, mu_x, mu_y, g, ix, iy, gen,
+                      save_history ? &h_x : nullptr,
+                      save_history ? &h_y : nullptr);
 
-            double Sigma_t = st[g];
-            double Sigma_s = ss[g];
-            double Sigma_f = sf[g];
-            double Sigma_a = Sigma_t - Sigma_s - Sigma_f; // pure capture
-
-            double R = dist_R(gen);
-            double d_coll = -std::log(R) / Sigma_t;
-
-            Side hit_side;
-            double d_surf = grid.distance_to_boundary(x, y, mu_x, mu_y, ix, iy, hit_side);
-
-            double d = std::min(d_coll, d_surf);
-            x += d * mu_x;
-            y += d * mu_y;
-
-            if (d_coll >= d_surf) {
-                if (hit_side != Side::None) {
-                    BoundaryType bc = grid.bc_for_side(hit_side);
-                    if (bc == BoundaryType::Vacuum) {
-                        results.transmission++;
-                        alive = false;
-                        break;
-                    } else {
-                        if (hit_side == Side::Left || hit_side == Side::Right) mu_x = -mu_x;
-                        else mu_y = -mu_y;
-                        if (save_history) { h_x.push_back(x); h_y.push_back(y); }
-                        continue;
-                    }
-                }
-                x += 1e-6 * mu_x;
-                y += 1e-6 * mu_y;
-                grid.find_index(x, y, ix, iy);
-                continue;
-            }
-
-            if (save_history) { h_x.push_back(x); h_y.push_back(y); }
-
-            // pick event by slicing [0, Sigma_t) into scatter / capture / fission
-            double P = dist_R(gen) * Sigma_t;
-            if (P < Sigma_s) {
-                // isotropic scatter, down-scatter only: new group uniform in [0, g]
-                phi = dist_phi(gen);
-                mu_x = std::cos(phi);
-                mu_y = std::sin(phi);
-                std::uniform_int_distribution<int> dist_newg(0, g);
-                g = dist_newg(gen);
-            } else if (P < Sigma_s + Sigma_a) {
-                alive = false;
-                results.absorp_by_material[cur_mat.symbol]++;
-            } else {
-                // fission branch: particle dies here, no neutron multiplication yet
-                // (sample_fission_neutrons() in physics.hpp is ready for when this
-                // is switched on) -- tallied separately from pure absorption
-                alive = false;
-                results.fission_by_material[cur_mat.symbol]++;
-            }
-        }
-
+        // trajectories are saved for source particles only (max_history_save keeps its meaning)
         if (save_history) {
             results.x_history.push_back(h_x);
             results.y_history.push_back(h_y);
         }
+
+        // Fission bank: do NOT move on to the next source particle until the bank is empty.
+        // Banked neutrons are transported exactly like any other neutron; a fission in here
+        // just appends more members to this same queue.
+        while (!fission_bank.empty()) {
+            print_progress(p + 1, false);
+
+            BankedNeutron n = fission_bank.front();  // copy first: transport_one() pushes to the bank
+            fission_bank.pop_front();
+
+            int bix, biy;
+            grid.find_index(n.x, n.y, bix, biy);
+            transport_one(n.x, n.y, n.mu_x, n.mu_y, n.g, bix, biy, gen, nullptr, nullptr);
+        }
     }
+
+    print_progress(N_particles, true);
 
     auto end_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff = end_time - start_time;
