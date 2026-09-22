@@ -240,7 +240,13 @@ void SimulationMG::run() {
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    fission_bank.clear();  // an interrupted earlier run() must not leak neutrons into this one
+    // Reset state left over from a PREVIOUS run() call on this same object --
+    // both the Tally (so results don't silently accumulate across two runs)
+    // and the fission bank (an interrupted earlier run() must not leak
+    // neutrons into this one; fission_bank.clear() below already covered
+    // that half, results = Tally{} covers the rest).
+    results = Tally{};
+    fission_bank.clear();
 
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -354,7 +360,8 @@ void SimulationMG::run() {
     py::print("====================================================\n");
     py::module_::import("sys").attr("stdout").attr("flush")();
 
-    export_xml();
+    // run() no longer writes to disk on its own -- call sim.export_xml("your_file.xml")
+    // explicitly afterward if/when you actually want a file. See export_xml() below.
 }
 
 void SimulationMG::export_xml(const std::string& filename) {

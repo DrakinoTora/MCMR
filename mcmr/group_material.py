@@ -1,4 +1,5 @@
 import xml.etree.ElementTree as ET
+from ._mcmr_cpp import canonical_material_name
 
 __all__ = ["GroupMaterial", "MaterialLibrary"]
 
@@ -6,13 +7,15 @@ __all__ = ["GroupMaterial", "MaterialLibrary"]
 class GroupMaterial:
     """Multi-group (discretized energy) cross-section data for ONE material.
 
-    `name` must match EXACTLY the material symbol used in this world's
-    material_matrix / circles -- "Be", "C", "Fe" or "Pb" (same canonical
-    spelling the C++ engine reports, see get_material_info() in
-    src/material.cpp). No alias table on the Python side: the engine already
-    resolves aliases (e.g. "besi", "iron") down to one of these 4 canonical
-    symbols internally, so as long as material_matrix and MaterialLibrary
-    agree on the canonical spelling, the two line up with no extra layer.
+    `name` can be any spelling the engine recognizes -- "Fe", "fe", "besi",
+    "iron", etc. It is resolved to the canonical symbol ("Be", "C", "Fe" or
+    "Pb") right here, through the SAME lookup the C++ engine uses internally
+    (see get_material_info() in src/material.cpp, exposed to Python as
+    canonical_material_name()). This is the single source of truth for
+    aliases: nothing else in this file, or in World._run_group(), keeps its
+    own copy of the alias table, so a GroupMaterial and the material_matrix
+    cell it's meant for always line up in the end, no matter which spelling
+    either one used.
 
     Number of groups (n_groups) is inferred from len(sigma_t) -- there is no
     separate "how many groups" parameter to keep in sync by hand.
@@ -30,6 +33,7 @@ class GroupMaterial:
     """
 
     def __init__(self, name, sigma_t, sigma_s, sigma_f=None, nu=None):
+        name = canonical_material_name(name)  # raises ValueError early if unknown
         sigma_t = list(sigma_t)
         sigma_s = list(sigma_s)
         n_groups = len(sigma_t)
@@ -93,14 +97,18 @@ class MaterialLibrary:
                 f"'{name}' has {gm.n_groups} groups, but this library already uses "
                 f"{self.n_groups} groups -- every material must share the same group structure"
             )
-        self.materials[name] = gm
+        self.materials[gm.name] = gm  # keyed by the CANONICAL name, not necessarily what the caller typed
         return self  # chainable
 
     def __contains__(self, name):
+        try:
+            name = canonical_material_name(name)
+        except ValueError:
+            return False  # not a material MCMR recognizes at all -> definitely not in here
         return name in self.materials
 
     def __getitem__(self, name):
-        return self.materials[name]
+        return self.materials[canonical_material_name(name)]
 
     # ------------------------------------------------------------------ #
     # Save / load to XML -- one file holds every material

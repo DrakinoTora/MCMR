@@ -94,6 +94,11 @@ void Simulation::set_cross_sections(
 }
 
 void Simulation::run() {
+    // Reset any state left over from a PREVIOUS run() call on this same object
+    // (results, saved-history buffers) so calling run() twice doesn't silently
+    // accumulate two runs' worth of particles into one Tally.
+    results = Tally{};
+
     py::print("====================================================");
     py::print("              MCMR Simulation Engine               ");
     py::print("====================================================");
@@ -261,7 +266,8 @@ void Simulation::run() {
     py::print("====================================================\n");
     py::module_::import("sys").attr("stdout").attr("flush")();
 
-    export_xml();
+    // run() no longer writes to disk on its own -- call sim.export_xml("your_file.xml")
+    // explicitly afterward if/when you actually want a file. See export_xml() below.
 }
 
 void Simulation::export_xml(const std::string& filename) {

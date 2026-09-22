@@ -192,16 +192,35 @@ class World:
         return sim
 
     def _run_group(self, N, max_save, group_materials):
-        from ._mcmr_cpp import SimulationMG
+        from ._mcmr_cpp import SimulationMG, canonical_material_name
 
         if group_materials is None:
             raise ValueError("mode='group' requires group_materials=<a MaterialLibrary>")
 
-        # every material name actually used in this world must be in the library.
-        # Names must match EXACTLY (same canonical spelling: Be, C, Fe, Pb) --
-        # see the note in GroupMaterial's docstring.
-        used_names = {name for row in self.material_matrix for name in row}
-        used_names |= {c["material"] for c in self.circles}
+        # Resolve every raw name actually used in this world (material_matrix + circles)
+        # to the SAME canonical spelling the C++ engine keys its group data on
+        # (via canonical_material_name(), a thin wrapper around get_material_info()).
+        # This is what keeps material_matrix=[["fe"]] and
+        # group_materials.add_material("Fe", ...) lined up even though they were
+        # spelled differently -- and turns an unrecognized name into a clear
+        # Python ValueError right here, instead of a std::map::at crash deep
+        # inside the C++ transport loop once the simulation is already running.
+        raw_names = {name for row in self.material_matrix for name in row}
+        raw_names |= {c["material"] for c in self.circles}
+        canonical_of = {}
+        unknown = []
+        for raw in raw_names:
+            try:
+                canonical_of[raw] = canonical_material_name(raw)
+            except ValueError:
+                unknown.append(raw)
+        if unknown:
+            raise ValueError(
+                f"material_matrix/circles use unrecognized material name(s): {', '.join(sorted(unknown))} "
+                "(known: Be, C, Fe, Pb, and their aliases -- see get_material_info() in src/material.cpp)"
+            )
+
+        used_names = set(canonical_of.values())
         missing = [n for n in used_names if n not in group_materials]
         if missing:
             raise ValueError(f"group_materials is missing data for: {', '.join(sorted(missing))}")
@@ -214,6 +233,9 @@ class World:
             sigma_f[name] = gm.sigma_f
             nu[name] = gm.nu
 
+        # material_matrix/circle_material go to C++ as-is (any alias); the C++
+        # constructor resolves them to the same canonical symbols via
+        # get_material_info(), so they land on the sigma_t/sigma_s/... keys above.
         sim = SimulationMG(
             N=N, x_world=self.x_world, y_world=self.y_world,
             x_grid=self.x_grid, y_grid=self.y_grid,

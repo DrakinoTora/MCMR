@@ -2,10 +2,23 @@
 #include <pybind11/stl.h>
 #include "simulation.hpp"
 #include "simulation_mg.hpp"
+#include "material.hpp"
 
 namespace py = pybind11;
 
 PYBIND11_MODULE(_mcmr_cpp, m) {
+    // Single source of truth for material name resolution: the SAME alias
+    // table (via get_material_info) that Simulation/SimulationMG use
+    // internally to build the geometry. Exposed so Python-side code (group
+    // materials, validation) can normalize names to the exact canonical
+    // spelling the C++ engines key their per-material data on, instead of
+    // duplicating -- and risking drifting from -- the alias table.
+    m.def("canonical_material_name", [](const std::string& name) {
+        return get_material_info(name).symbol;
+    }, py::arg("name"),
+       "Resolve a material name/alias (e.g. 'fe', 'besi', 'iron') to its "
+       "canonical symbol ('Fe'). Raises ValueError if the name is unknown.");
+
     py::class_<Tally>(m, "Tally")
         .def_readonly("absorp_by_material", &Tally::absorp_by_material)
         .def_readonly("fission_by_material", &Tally::fission_by_material)
