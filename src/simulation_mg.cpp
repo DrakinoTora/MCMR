@@ -147,7 +147,23 @@ void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, i
     const bool save_history = (h_x != nullptr && h_y != nullptr);
 
     bool alive = true;
+    // Guards against a medium with zero absorption/fission probability inside
+    // an all-reflective enclosure, where a neutron can never leak or die and
+    // this loop would otherwise never return (and, since it never reaches a
+    // Python-visible frame, Ctrl-C could not interrupt it either).
+    constexpr long long kMaxCollisions = 5'000'000;
+    long long n_collisions = 0;
     while (alive) {
+        if ((++n_collisions % 100'000) == 0) {
+            if (PyErr_CheckSignals() != 0) throw py::error_already_set();
+            if (n_collisions >= kMaxCollisions)
+                throw std::runtime_error(
+                    "transport_one: exceeded " + std::to_string(kMaxCollisions) +
+                    " collisions for a single neutron. This usually means the medium has "
+                    "zero absorption/fission probability in some group while all boundaries "
+                    "are reflective, so the neutron can never leak or die. Check sigma_a "
+                    "(sigma_t - sigma_s - sigma_f) and the geometry's boundary conditions.");
+        }
         const MaterialInfo& cur_mat = grid.material_at(x, y, ix, iy);
         const auto& st = sigma_t.at(cur_mat.symbol);
         const auto& ss = sigma_s.at(cur_mat.symbol);

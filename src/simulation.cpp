@@ -120,7 +120,9 @@ void Simulation::run() {
 
         if ((i + 1) % step_update == 0 || i == N_particles - 1) {
             int current = i + 1;
-            int percent = (current * 100) / N_particles;
+            // Compute in long long: current*100 overflows a 32-bit int once
+            // N_particles exceeds ~21.5 million (matches the fix already used in simulation_mg.cpp).
+            int percent = static_cast<int>(static_cast<long long>(current) * 100 / N_particles);
 
             std::stringstream ss;
             ss << "\rProgress: [" << current << "/" << N_particles << "] (" << percent << "%)";
@@ -175,8 +177,12 @@ void Simulation::run() {
         while (alive) {
             const MaterialInfo& cur_mat = grid.material_at(x, y, ix, iy);
 
-            double Sigma_t = Sigma_count(E_data_total.at(cur_mat.mat_code), Sig_data_total.at(cur_mat.mat_code), E);
-            double Sigma_s = Sigma_count(E_data_scatter.at(cur_mat.mat_code), Sig_data_scatter.at(cur_mat.mat_code), E);
+            // Sigma_count returns the microscopic cross section sigma [barn] interpolated
+            // from data. Convert to macroscopic Sigma [cm^-1] with the atomic number
+            // density: Sigma = sigma[barn] * atom_density[atoms/cm^3] * 1e-24[cm^2/barn].
+            const double barn_to_Sigma = cur_mat.atom_density * 1e-24;
+            double Sigma_t = Sigma_count(E_data_total.at(cur_mat.mat_code), Sig_data_total.at(cur_mat.mat_code), E) * barn_to_Sigma;
+            double Sigma_s = Sigma_count(E_data_scatter.at(cur_mat.mat_code), Sig_data_scatter.at(cur_mat.mat_code), E) * barn_to_Sigma;
 
             double R = dist_R(gen);
             double d_coll = -std::log(R) / Sigma_t;
@@ -215,11 +221,6 @@ void Simulation::run() {
                 y += 1e-6 * mu_y;
                 grid.find_index(x, y, ix, iy);
                 continue;
-            }
-
-            if (save_history) {
-                h_x.push_back(x);
-                h_y.push_back(y);
             }
 
             if (save_history) {

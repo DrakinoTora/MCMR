@@ -1,4 +1,4 @@
-from ._mcmr_cpp import Tally, Simulation
+from ._mcmr_cpp import Tally, Simulation, SimulationMG
 from .cross_section import load_cross_section, load_all_materials
 from .plotter import ResultsPlotter
 from .world import World
