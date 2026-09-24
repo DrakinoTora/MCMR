@@ -189,6 +189,7 @@ void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, i
                 BoundaryType bc = grid.bc_for_side(hit_side);
                 if (bc == BoundaryType::Vacuum) {
                     results.transmission++;
+                    results.G_leak.push_back(g);
                     alive = false;
                     break;
                 } else {
@@ -228,7 +229,7 @@ void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, i
             int n_children = sample_fission_neutrons(nu.at(cur_mat.symbol)[g]);
             for (int k = 0; k < n_children; ++k) {
                 double child_phi = dist_phi(gen);
-                fission_bank.push_back({x, y, std::cos(child_phi), std::sin(child_phi), g});
+                fission_bank.push_back({x, y, std::cos(child_phi), std::sin(child_phi), g, save_history});
             }
         }
     }
@@ -319,6 +320,7 @@ void SimulationMG::run() {
         double mu_x = std::cos(phi);
         double mu_y = std::sin(phi);
         int g = dist_g0(gen); // group born uniformly
+        results.G_born.push_back(g);
 
         if (save_history) { h_x.push_back(x); h_y.push_back(y); }
 
@@ -335,6 +337,13 @@ void SimulationMG::run() {
         // Fission bank: do NOT move on to the next source particle until the bank is empty.
         // Banked neutrons are transported exactly like any other neutron; a fission in here
         // just appends more members to this same queue.
+        //
+        // Trajectory bookkeeping: a banked neutron gets its OWN <particle_history> entry
+        // (starting at its birth/fission position) iff n.save_history is true -- i.e. it
+        // descends from one of the max_history_save source particles whose trajectory was
+        // being recorded. This is IN ADDITION TO the max_history_save cap, not counted
+        // against it: e.g. max_save=100, and among those 100 source particles, 10 fission
+        // into 3 children each -> 100 + 30 = 130 entries in <trajectories>.
         while (!fission_bank.empty()) {
             print_progress(p + 1, false);
 
@@ -343,7 +352,17 @@ void SimulationMG::run() {
 
             int bix, biy;
             grid.find_index(n.x, n.y, bix, biy);
-            transport_one(n.x, n.y, n.mu_x, n.mu_y, n.g, bix, biy, gen, nullptr, nullptr);
+
+            if (n.save_history) {
+                std::vector<double> ch_x, ch_y;
+                ch_x.push_back(n.x);
+                ch_y.push_back(n.y);
+                transport_one(n.x, n.y, n.mu_x, n.mu_y, n.g, bix, biy, gen, &ch_x, &ch_y);
+                results.x_history.push_back(ch_x);
+                results.y_history.push_back(ch_y);
+            } else {
+                transport_one(n.x, n.y, n.mu_x, n.mu_y, n.g, bix, biy, gen, nullptr, nullptr);
+            }
         }
     }
 

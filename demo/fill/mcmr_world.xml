@@ -1,0 +1,95 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<mcmr_world>
+  <dimensions x_world="64.0" y_world="64.0" />
+  <grid>
+    <x_grid>8.0,16.0,24.0,32.0,40.0,48.0,56.0</x_grid>
+    <y_grid>8.0,16.0,24.0,32.0,40.0,48.0,56.0</y_grid>
+  </grid>
+  <boundary top="reflective" bottom="reflective" left="reflective" right="reflective" />
+  <materials>
+    <row index="0">Pb,Pb,Pb,Pb,Pb,Pb,Pb,Pb</row>
+    <row index="1">Fe,Pb,Be,Pb,Be,Pb,Be,Pb</row>
+    <row index="2">Pb,Pb,Pb,Pb,Pb,Pb,Pb,Pb</row>
+    <row index="3">Fe,Pb,Be,Pb,Be,Pb,Be,Pb</row>
+    <row index="4">Pb,Pb,Pb,Pb,Pb,Pb,Pb,Pb</row>
+    <row index="5">Fe,Pb,Be,Pb,Be,Pb,Be,Pb</row>
+    <row index="6">Pb,Pb,Pb,Pb,Pb,Pb,Pb,Pb</row>
+    <row index="7">Fe,Pb,Fe,Pb,Fe,Pb,Fe,Pb</row>
+  </materials>
+  <sources>
+    <row index="0">0,0,0,0,0,0,0,0</row>
+    <row index="1">0,0,0,0,0,0,0,0</row>
+    <row index="2">0,0,0,0,0,0,0,0</row>
+    <row index="3">0,0,0,0,0,0,0,0</row>
+    <row index="4">0,0,0,0,0,0,0,0</row>
+    <row index="5">0,0,0,0,0,0,0,0</row>
+    <row index="6">0,0,0,0,0,0,0,0</row>
+    <row index="7">0,0,0,0,0,0,0,0</row>
+  </sources>
+  <circles>
+    <circle cx="4" cy="4" r="2.5" material="C" source="1" />
+    <circle cx="4" cy="12" r="2.5" material="C" source="1" />
+    <circle cx="4" cy="20" r="2.5" material="C" source="1" />
+    <circle cx="4" cy="28" r="2.5" material="C" source="1" />
+    <circle cx="4" cy="36" r="2.5" material="C" source="1" />
+    <circle cx="4" cy="44" r="2.5" material="C" source="1" />
+    <circle cx="4" cy="52" r="2.5" material="C" source="1" />
+    <circle cx="4" cy="60" r="2.5" material="C" source="1" />
+    <circle cx="12" cy="4" r="2.5" material="C" source="1" />
+    <circle cx="12" cy="12" r="2.5" material="C" source="1" />
+    <circle cx="12" cy="20" r="2.5" material="C" source="1" />
+    <circle cx="12" cy="28" r="2.5" material="C" source="1" />
+    <circle cx="12" cy="36" r="2.5" material="C" source="1" />
+    <circle cx="12" cy="44" r="2.5" material="C" source="1" />
+    <circle cx="12" cy="52" r="2.5" material="C" source="1" />
+    <circle cx="12" cy="60" r="2.5" material="C" source="1" />
+    <circle cx="20" cy="4" r="2.5" material="C" source="1" />
+    <circle cx="20" cy="12" r="2.5" material="C" source="1" />
+    <circle cx="20" cy="20" r="2.5" material="C" source="1" />
+    <circle cx="20" cy="28" r="2.5" material="C" source="1" />
+    <circle cx="20" cy="36" r="2.5" material="C" source="1" />
+    <circle cx="20" cy="44" r="2.5" material="C" source="1" />
+    <circle cx="20" cy="52" r="2.5" material="C" source="1" />
+    <circle cx="20" cy="60" r="2.5" material="C" source="1" />
+    <circle cx="28" cy="4" r="2.5" material="C" source="1" />
+    <circle cx="28" cy="12" r="2.5" material="C" source="1" />
+    <circle cx="28" cy="20" r="2.5" material="C" source="1" />
+    <circle cx="28" cy="28" r="2.5" material="C" source="1" />
+    <circle cx="28" cy="36" r="2.5" material="C" source="1" />
+    <circle cx="28" cy="44" r="2.5" material="C" source="1" />
+    <circle cx="28" cy="52" r="2.5" material="C" source="1" />
+    <circle cx="28" cy="60" r="2.5" material="C" source="1" />
+    <circle cx="36" cy="4" r="2.5" material="C" source="1" />
+    <circle cx="36" cy="12" r="2.5" material="C" source="1" />
+    <circle cx="36" cy="20" r="2.5" material="C" source="1" />
+    <circle cx="36" cy="28" r="2.5" material="C" source="1" />
+    <circle cx="36" cy="36" r="2.5" material="C" source="1" />
+    <circle cx="36" cy="44" r="2.5" material="C" source="1" />
+    <circle cx="36" cy="52" r="2.5" material="C" source="1" />
+    <circle cx="36" cy="60" r="2.5" material="C" source="1" />
+    <circle cx="44" cy="4" r="2.5" material="C" source="1" />
+    <circle cx="44" cy="12" r="2.5" material="C" source="1" />
+    <circle cx="44" cy="20" r="2.5" material="C" source="1" />
+    <circle cx="44" cy="28" r="2.5" material="C" source="1" />
+    <circle cx="44" cy="36" r="2.5" material="C" source="1" />
+    <circle cx="44" cy="44" r="2.5" material="C" source="1" />
+    <circle cx="44" cy="52" r="2.5" material="C" source="1" />
+    <circle cx="44" cy="60" r="2.5" material="C" source="1" />
+    <circle cx="52" cy="4" r="2.5" material="C" source="1" />
+    <circle cx="52" cy="12" r="2.5" material="C" source="1" />
+    <circle cx="52" cy="20" r="2.5" material="C" source="1" />
+    <circle cx="52" cy="28" r="2.5" material="C" source="1" />
+    <circle cx="52" cy="36" r="2.5" material="C" source="1" />
+    <circle cx="52" cy="44" r="2.5" material="C" source="1" />
+    <circle cx="52" cy="52" r="2.5" material="C" source="1" />
+    <circle cx="52" cy="60" r="2.5" material="C" source="1" />
+    <circle cx="60" cy="4" r="2.5" material="C" source="1" />
+    <circle cx="60" cy="12" r="2.5" material="C" source="1" />
+    <circle cx="60" cy="20" r="2.5" material="C" source="1" />
+    <circle cx="60" cy="28" r="2.5" material="C" source="1" />
+    <circle cx="60" cy="36" r="2.5" material="C" source="1" />
+    <circle cx="60" cy="44" r="2.5" material="C" source="1" />
+    <circle cx="60" cy="52" r="2.5" material="C" source="1" />
+    <circle cx="60" cy="60" r="2.5" material="C" source="1" />
+  </circles>
+</mcmr_world>

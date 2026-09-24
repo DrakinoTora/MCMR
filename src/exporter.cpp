@@ -29,6 +29,18 @@ void export_to_xml(const Tally& tally, const std::string& filename) {
     }
     f << "\n  </energy_leak>\n";
 
+    f << "  <group_born>\n    ";
+    for (size_t i = 0; i < tally.G_born.size(); ++i) {
+        f << tally.G_born[i] << (i + 1 == tally.G_born.size() ? "" : ",");
+    }
+    f << "\n  </group_born>\n";
+
+    f << "  <group_leak>\n    ";
+    for (size_t i = 0; i < tally.G_leak.size(); ++i) {
+        f << tally.G_leak[i] << (i + 1 == tally.G_leak.size() ? "" : ",");
+    }
+    f << "\n  </group_leak>\n";
+
     f << "  <trajectories>\n";
     for (size_t i = 0; i < tally.x_history.size(); ++i) {
         f << "    <particle_history id=\"" << i << "\">\n";

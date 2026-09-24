@@ -26,6 +26,8 @@ PYBIND11_MODULE(_mcmr_cpp, m) {
         .def_readonly("time_taken", &Tally::time_taken)
         .def_readonly("E_born", &Tally::E_born)
         .def_readonly("E_leak", &Tally::E_leak)
+        .def_readonly("G_born", &Tally::G_born)
+        .def_readonly("G_leak", &Tally::G_leak)
         .def_readonly("x_history", &Tally::x_history)
         .def_readonly("y_history", &Tally::y_history);
 

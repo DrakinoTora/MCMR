@@ -25,11 +25,18 @@
 //     finishes, which is why run() prints the bank size next to the progress.
 class SimulationMG {
 private:
-    // neutron born from fission, waiting in fission_bank to be transported
+    // neutron born from fission, waiting in fission_bank to be transported.
+    // save_history: true iff this child descends from one of the first
+    // max_history_save SOURCE particles -- propagated from parent to child at
+    // every fission, so it can chain through multiple generations. Determines
+    // whether THIS neutron gets its own <particle_history> entry, independent
+    // of max_history_save (fission trajectories are recorded IN ADDITION TO
+    // the max_history_save source trajectories, not counted against that cap).
     struct BankedNeutron {
         double x, y;
         double mu_x, mu_y;
         int g;
+        bool save_history;
     };
 
     int N_particles;
