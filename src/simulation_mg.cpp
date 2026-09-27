@@ -386,15 +386,13 @@ void SimulationMG::run(int n_gen) {
         }
 
         print_progress(N_particles, gen_idx, true);
-        py::print(""); // keep each generation's final progress line on screen
-        py::module_::import("sys").attr("stdout").attr("flush")();
     }
 
     auto end_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff = end_time - start_time;
     results.time_taken = diff.count();
 
-    py::print("====================================================");
+    py::print("\n====================================================");
     std::stringstream ss_end;
     ss_end << " Simulation End in " << std::fixed << std::setprecision(4) << results.time_taken << " seconds.";
     py::print(ss_end.str());
