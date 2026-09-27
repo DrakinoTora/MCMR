@@ -109,7 +109,7 @@ PYBIND11_MODULE(_mcmr_cpp, m) {
             py::arg("circle_r") = std::vector<double>{},
             py::arg("circle_material") = std::vector<std::string>{},
             py::arg("circle_source") = std::vector<double>{},
-            py::arg("max_history_save") = 50,
+            py::arg("max_history_save") = 10,
             py::arg("tally_res_x") = 0,
             py::arg("tally_res_y") = 0,
             py::arg("bc_top") = "vacuum",

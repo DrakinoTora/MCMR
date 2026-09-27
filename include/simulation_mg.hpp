@@ -95,7 +95,7 @@ public:
            const std::vector<double>& circle_r = {},
            const std::vector<std::string>& circle_material = {},
            const std::vector<double>& circle_source = {},
-           int max_save = 50,
+           int max_save = 10,
            int tally_res_x = 0,
            int tally_res_y = 0,
            const std::string& bc_top   = "vacuum",

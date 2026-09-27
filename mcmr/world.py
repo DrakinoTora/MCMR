@@ -142,7 +142,7 @@ class World:
     # ------------------------------------------------------------------ #
     # Run simulation
     # ------------------------------------------------------------------ #
-    def run(self, N, max_save=50, mode="continuous", group_materials=None, n_gen=1, resolution=None):
+    def run(self, N, max_save=10, mode="continuous", group_materials=None, n_gen=1, resolution=None):
         """Run the Monte Carlo simulation for this world. Returns a Simulation
         (or SimulationMG) object, already .run().
 
