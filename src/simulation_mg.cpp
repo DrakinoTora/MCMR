@@ -1,6 +1,7 @@
 #include "simulation_mg.hpp"
 #include "physics.hpp"
 #include "exporter.hpp"
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <random>
@@ -22,6 +23,8 @@ SimulationMG::SimulationMG(int N, double x_world, double y_world,
                         const std::vector<std::string>& circle_material,
                         const std::vector<double>& circle_source,
                         int max_save,
+                        int tally_res_x_,
+                        int tally_res_y_,
                         const std::string& bc_top,
                         const std::string& bc_bot,
                         const std::string& bc_left,
@@ -29,7 +32,11 @@ SimulationMG::SimulationMG(int N, double x_world, double y_world,
     : N_particles(N),
       grid(x_world, y_world, x_grid, y_grid, material_matrix,
            bc_left, bc_right, bc_bot, bc_top),
-      max_history_save(max_save) {
+      max_history_save(max_save),
+      // 0 (unset) falls back to one tally cell per world unit -- e.g. a
+      // 60x50 world defaults to a 60x50 tally grid (1x1 cells)
+      tally_res_x(tally_res_x_ > 0 ? tally_res_x_ : std::max(1, static_cast<int>(std::lround(x_world)))),
+      tally_res_y(tally_res_y_ > 0 ? tally_res_y_ : std::max(1, static_cast<int>(std::lround(y_world)))) {
 
     // -- geometry / source setup: identical logic to Simulation's constructor --
     int nx = grid.nx();
@@ -218,13 +225,13 @@ void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, i
             g = dist_newg(gen);
         } else if (P < Sigma_s + Sigma_a) {
             alive = false;
-            results.absorp_by_material[cur_mat.symbol]++;
+            results.add_region_hit(x, y);
         } else {
             // fission: the parent dies here, its children go into the fission bank.
             // position = parent's position, group = parent's group,
             // direction = a fresh isotropic direction for EACH child
             alive = false;
-            results.fission_by_material[cur_mat.symbol]++;
+            results.add_region_hit(x, y);
 
             int n_children = sample_fission_neutrons(nu.at(cur_mat.symbol)[g]);
             for (int k = 0; k < n_children; ++k) {
@@ -249,6 +256,7 @@ void SimulationMG::run(int n_gen) {
     // neutrons into this one; fission_bank.clear() below already covered
     // that half, results = Tally{} covers the rest).
     results = Tally{};
+    results.init_region_tally(tally_res_x, tally_res_y, grid.world_max_x(), grid.world_max_y());
     fission_bank.clear();
 
     std::random_device rd;

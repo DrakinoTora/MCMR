@@ -14,7 +14,8 @@
 //   - sigma_t / sigma_s / sigma_f: direct per-group lookup, no interpolation
 //   - scatter: isotropic direction, new group sampled uniform over [0, g]
 //     (down-scatter only -- group 0 = fastest, higher index = lower energy)
-//   - fission: the parent dies (tallied in fission_by_material) and
+//   - fission: the parent dies (tallied into the region tally, at its
+//     position) and
 //     sample_fission_neutrons(nu[g]) children are pushed into fission_bank:
 //     same position and same group as the parent, each with its own
 //     isotropic direction.
@@ -56,6 +57,11 @@ private:
     int max_history_save;
     int n_groups = 0;
 
+    // resolution of the region-based tally grid (see Tally::init_region_tally),
+    // fixed at construction time, re-applied to `results` at the top of every run()
+    int tally_res_x;
+    int tally_res_y;
+
     std::vector<double> flat_source_weights;
     int n_grid_cells = 0;
 
@@ -90,6 +96,8 @@ public:
            const std::vector<std::string>& circle_material = {},
            const std::vector<double>& circle_source = {},
            int max_save = 50,
+           int tally_res_x = 0,
+           int tally_res_y = 0,
            const std::string& bc_top   = "vacuum",
            const std::string& bc_bot   = "vacuum",
            const std::string& bc_left  = "vacuum",
@@ -107,8 +115,9 @@ public:
     // above for what a generation is). Default 1 = a single generation
     // sourced from the user-specified spatial/group distribution -- any
     // fission products are left sitting unresampled in fission_bank once
-    // run() returns (accessible only indirectly, through fission_by_material's
-    // count; they are NOT transported). Pass n_gen>1 to cycle the fission
+    // run() returns (their parent fission events are still reflected in the
+    // region tally; the children themselves are NOT transported). Pass
+    // n_gen>1 to cycle the fission
     // source across generations (power iteration).
     void run(int n_gen = 1);
     void export_xml(const std::string& filename = "mcmr_results_mg.xml");

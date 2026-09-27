@@ -23,6 +23,11 @@ private:
     std::map<int, std::vector<double>> E_data_scatter;
     std::map<int, std::vector<double>> Sig_data_scatter;
 
+    // resolution of the region-based tally grid (see Tally::init_region_tally),
+    // fixed at construction time, re-applied to `results` at the top of every run()
+    int tally_res_x;
+    int tally_res_y;
+
     Tally results;
 
 public:
@@ -37,6 +42,8 @@ public:
            const std::vector<std::string>& circle_material = {},
            const std::vector<double>& circle_source = {},
            int max_save = 10,
+           int tally_res_x = 0,
+           int tally_res_y = 0,
            const std::string& bc_top   = "vacuum",
            const std::string& bc_bot   = "vacuum",
            const std::string& bc_left  = "vacuum",

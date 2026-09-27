@@ -1,6 +1,7 @@
 #include "simulation.hpp"
 #include "physics.hpp"
 #include "exporter.hpp"
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <random>
@@ -22,6 +23,8 @@ Simulation::Simulation(int N, double x_world, double y_world,
                         const std::vector<std::string>& circle_material,
                         const std::vector<double>& circle_source,
                         int max_save,
+                        int tally_res_x_,
+                        int tally_res_y_,
                         const std::string& bc_top,
                         const std::string& bc_bot,
                         const std::string& bc_left,
@@ -29,7 +32,11 @@ Simulation::Simulation(int N, double x_world, double y_world,
     : N_particles(N),
       grid(x_world, y_world, x_grid, y_grid, material_matrix,
            bc_left, bc_right, bc_bot, bc_top),
-      max_history_save(max_save) {
+      max_history_save(max_save),
+      // 0 (unset) falls back to one tally cell per world unit -- e.g. a
+      // 60x50 world defaults to a 60x50 tally grid (1x1 cells)
+      tally_res_x(tally_res_x_ > 0 ? tally_res_x_ : std::max(1, static_cast<int>(std::lround(x_world)))),
+      tally_res_y(tally_res_y_ > 0 ? tally_res_y_ : std::max(1, static_cast<int>(std::lround(y_world)))) {
 
     int nx = grid.nx();
     int ny = grid.ny();
@@ -98,6 +105,7 @@ void Simulation::run() {
     // (results, saved-history buffers) so calling run() twice doesn't silently
     // accumulate two runs' worth of particles into one Tally.
     results = Tally{};
+    results.init_region_tally(tally_res_x, tally_res_y, grid.world_max_x(), grid.world_max_y());
 
     py::print("====================================================");
     py::print("              MCMR Simulation Engine               ");
@@ -244,7 +252,7 @@ void Simulation::run() {
                 E = E_scatter(E, alpha, phi);
             } else {
                 alive = false;
-                results.absorp_by_material[cur_mat.symbol]++;
+                results.add_region_hit(x, y);
             }
         }
 

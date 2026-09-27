@@ -142,7 +142,7 @@ class World:
     # ------------------------------------------------------------------ #
     # Run simulation
     # ------------------------------------------------------------------ #
-    def run(self, N, max_save=50, mode="continuous", group_materials=None, n_gen=1):
+    def run(self, N, max_save=50, mode="continuous", group_materials=None, n_gen=1, resolution=None):
         """Run the Monte Carlo simulation for this world. Returns a Simulation
         (or SimulationMG) object, already .run().
 
@@ -162,9 +162,24 @@ class World:
                    keeping the population size fixed at N every generation
                    regardless of whether the system is sub/super/critical.
                    Default 1 = a single generation -- any fission products are
-                   left sitting in the bank, uncounted beyond
-                   fission_by_material, never transported. Ignored (must stay
-                   1) for mode="continuous", which has no concept of generations.
+                   left sitting in the bank, uncounted beyond the region tally
+                   (see below), never transported. Ignored (must stay 1) for
+                   mode="continuous", which has no concept of generations.
+        resolution : resolution of the RESULT's region-based tally grid -- a
+                   grid laid independently over the whole world (NOT tied to
+                   material_matrix/x_grid/y_grid at all). Every time a
+                   neutron is absorbed or undergoes fission, the tally cell
+                   it physically happened in gets +1 point (every cell starts
+                   at 0); this replaces the old per-material absorp/fission
+                   counters. Accepts either a single number (used for both
+                   axes) or an (res_x, res_y) pair -- e.g. on a 50x50 world,
+                   resolution=100 (or (100, 100)) makes a 100x100 tally grid,
+                   i.e. each cell is 0.5x0.5. Default (None) = one tally cell
+                   per world unit: e.g. a 60x50 world defaults to a 60x50
+                   tally grid (1x1 cells). The resulting grid is available as
+                   sim.get_tally().region_tally (flat, row-major -- reshape
+                   using .tally_nx / .tally_ny) and is written to
+                   <region_tally> in the results XML by export_xml().
 
         [row][col] index convention for material_matrix / sources: row=0 is the
         TOPMOST row (highest y), col=0 is the LEFTMOST column (x=0) -- written
@@ -176,13 +191,34 @@ class World:
         if mode not in ("continuous", "group"):
             raise ValueError(f"mode must be 'continuous' or 'group', got {mode!r}")
 
+        res_x, res_y = self._resolve_resolution(resolution)
+
         if mode == "continuous":
             if n_gen != 1:
                 raise ValueError("n_gen only applies to mode='group' (continuous has no generations)")
-            return self._run_continuous(N, max_save)
-        return self._run_group(N, max_save, group_materials, n_gen)
+            return self._run_continuous(N, max_save, res_x, res_y)
+        return self._run_group(N, max_save, group_materials, n_gen, res_x, res_y)
 
-    def _run_continuous(self, N, max_save):
+    def _resolve_resolution(self, resolution):
+        """Resolve run()'s `resolution` argument into a concrete (res_x, res_y)
+        pair of positive ints. None -> one tally cell per world unit (i.e. the
+        tally grid matches the world's own dimensions, rounded to the nearest int).
+        """
+        if resolution is None:
+            res_x, res_y = round(self.x_world), round(self.y_world)
+        elif isinstance(resolution, (tuple, list)):
+            if len(resolution) != 2:
+                raise ValueError("resolution must be a single number or an (res_x, res_y) pair")
+            res_x, res_y = resolution
+        else:
+            res_x = res_y = resolution
+
+        res_x, res_y = int(res_x), int(res_y)
+        if res_x <= 0 or res_y <= 0:
+            raise ValueError(f"resolution must be positive, got ({res_x}, {res_y})")
+        return res_x, res_y
+
+    def _run_continuous(self, N, max_save, res_x, res_y):
         from ._mcmr_cpp import Simulation
         from .cross_section import load_all_materials
 
@@ -196,6 +232,7 @@ class World:
             circle_material=[c["material"] for c in self.circles],
             circle_source=[c["source"] for c in self.circles],
             max_history_save=max_save,
+            tally_res_x=res_x, tally_res_y=res_y,
             bc_top=self.bc_top, bc_bot=self.bc_bot, bc_left=self.bc_left, bc_right=self.bc_right,
         )
         E_tot, Sig_tot, E_scat, Sig_scat = load_all_materials()
@@ -204,7 +241,7 @@ class World:
         sim.run()
         return sim
 
-    def _run_group(self, N, max_save, group_materials, n_gen=1):
+    def _run_group(self, N, max_save, group_materials, n_gen, res_x, res_y):
         from ._mcmr_cpp import SimulationMG, canonical_material_name
 
         if group_materials is None:
@@ -259,6 +296,7 @@ class World:
             circle_material=[c["material"] for c in self.circles],
             circle_source=[c["source"] for c in self.circles],
             max_history_save=max_save,
+            tally_res_x=res_x, tally_res_y=res_y,
             bc_top=self.bc_top, bc_bot=self.bc_bot, bc_left=self.bc_left, bc_right=self.bc_right,
         )
         sim.set_group_data(group_materials.n_groups, sigma_t, sigma_s, sigma_f, nu)
