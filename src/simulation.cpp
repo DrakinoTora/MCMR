@@ -252,7 +252,7 @@ void Simulation::run() {
                 E = E_scatter(E, alpha, phi);
             } else {
                 alive = false;
-                results.add_region_hit(x, y);
+                results.add_absorp_hit(x, y);
             }
         }
 

@@ -20,12 +20,15 @@ struct Tally {
     std::vector<int> history_generation;
 
     // ------------------------------------------------------------------ //
-    // Region-based tally grid: a resolution grid laid independently over the
-    // WHOLE WORLD (not tied to material_matrix's grid at all). Every fission
-    // or absorption event increments, by 1 point, the cell it physically
-    // occurred in (every cell starts at 0). tally_nx/tally_ny = number of
-    // columns/rows; tally_dx/tally_dy = each cell's width/height in world
-    // units (= x_world/tally_nx, y_world/tally_ny).
+    // Region-based tally grids: a resolution grid laid independently over the
+    // WHOLE WORLD (not tied to material_matrix's grid at all). Fission and
+    // absorption events are tracked in SEPARATE grids so each can be
+    // visualized (heatmap) independently -- fission_tally only counts
+    // fission events, absorp_tally only counts (non-fission) absorption
+    // events. Continuous mode (Simulation, no fission model) only ever
+    // populates absorp_tally; fission_tally stays all-zero for it.
+    // tally_nx/tally_ny = number of columns/rows; tally_dx/tally_dy = each
+    // cell's width/height in world units (= x_world/tally_nx, y_world/tally_ny).
     //
     // Flat, row-major: index = iy_t * tally_nx + ix_t, where ix_t=0 is the
     // LEFTMOST column (x=0) and iy_t=0 is the BOTTOM row (y=0) -- this
@@ -33,19 +36,22 @@ struct Tally {
     // row=0=topmost convention used by material_matrix/sources in the
     // Python API).
     // ------------------------------------------------------------------ //
-    std::vector<int> region_tally;
+    std::vector<int> fission_tally;
+    std::vector<int> absorp_tally;
     int tally_nx = 0;
     int tally_ny = 0;
     double tally_dx = 0.0;
     double tally_dy = 0.0;
 
-    // (Re)initialize the tally grid to nx x ny cells covering [0,x_world] x
+    // (Re)initialize both tally grids to nx x ny cells covering [0,x_world] x
     // [0,y_world], all zeroed. Called once per run() (after the rest of the
     // Tally is reset) so every fresh run starts from an all-zero grid.
     void init_region_tally(int nx, int ny, double x_world, double y_world);
 
-    // Increment the tally cell containing (x, y) by 1. A point that falls
-    // (very slightly, from floating point) outside [0,x_world] x [0,y_world]
-    // is clamped to the nearest edge cell instead of being silently dropped.
-    void add_region_hit(double x, double y);
+    // Increment the fission_tally / absorp_tally cell containing (x, y) by 1.
+    // A point that falls (very slightly, from floating point) outside
+    // [0,x_world] x [0,y_world] is clamped to the nearest edge cell instead
+    // of being silently dropped.
+    void add_fission_hit(double x, double y);
+    void add_absorp_hit(double x, double y);
 };

@@ -35,7 +35,8 @@ PYBIND11_MODULE(_mcmr_cpp, m) {
         // adds 1 point to the cell it occurred in. region_tally is flat,
         // row-major (index = iy_t*tally_nx + ix_t, iy_t=0 = bottom row/y=0,
         // ix_t=0 = leftmost col/x=0); reshape client-side using tally_nx/tally_ny.
-        .def_readonly("region_tally", &Tally::region_tally)
+        .def_readonly("fission_tally", &Tally::fission_tally)
+        .def_readonly("absorp_tally", &Tally::absorp_tally)
         .def_readonly("tally_nx", &Tally::tally_nx)
         .def_readonly("tally_ny", &Tally::tally_ny)
         .def_readonly("tally_dx", &Tally::tally_dx)

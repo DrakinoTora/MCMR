@@ -1,5 +1,6 @@
 import itertools
 import xml.etree.ElementTree as ET
+import numpy as np
 
 import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
@@ -126,3 +127,72 @@ class ResultsPlotter:
         ax.set_aspect("equal")
         plt.tight_layout()
         plt.show()
+    
+    def _region_heatmap(self, tag, title, cmap, world_xml=None):
+        el = self.root.find(f".//{tag}")
+        if el is None:
+            raise ValueError(
+                f"this results XML has no <{tag}> block -- it was produced by an "
+                "older engine build that didn't separate fission/absorption tallies; "
+                "rerun the simulation with the current mcmr build."
+            )
+
+        nx = int(el.get("nx"))
+        ny = int(el.get("ny"))
+        dx = float(el.get("dx"))
+        dy = float(el.get("dy"))
+        rows = el.findall("row")
+        # <row index="0"> = BOTTOM row (y=0), same as imshow(origin="lower")
+        data = np.array([[int(v) for v in row.text.split(",")] for row in rows])
+
+        x_world = nx * dx
+        y_world = ny * dy
+
+        fig, ax = plt.subplots(figsize=(8, 7))
+        im = ax.imshow(
+            data, origin="lower", extent=[0, x_world, 0, y_world],
+            cmap=cmap, interpolation="nearest", zorder=0,
+        )
+        cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cbar.set_label("Event count")
+
+        if world_xml is not None:
+            w = World.load(world_xml)
+            x_edges = [0.0] + list(w.x_grid) + [w.x_world]
+            y_edges = [0.0] + list(w.y_grid) + [w.y_world]
+            for xe in x_edges:
+                ax.axvline(xe, color="white", linewidth=0.5, alpha=0.4, zorder=1)
+            for ye in y_edges:
+                ax.axhline(ye, color="white", linewidth=0.5, alpha=0.4, zorder=1)
+            for c in w.circles:
+                ax.add_patch(Circle(
+                    (c["cx"], c["cy"]), c["r"],
+                    fill=False, edgecolor="white", linewidth=0.8, alpha=0.6, zorder=1,
+                ))
+            x_world, y_world = w.x_world, w.y_world
+
+        if data.max() == 0:
+            print(f"[mcmr] Note: <{tag}> is entirely zero in this results XML -- "
+                "either no such event occurred, or (for fission_tally on a "
+                "continuous-mode run) the engine has no fission model at all "
+                "in that mode, so it's expected to stay zero.")
+
+        ax.set_xlim(0, x_world)
+        ax.set_ylim(0, y_world)
+        ax.set_xlabel("X (cm)")
+        ax.set_ylabel("Y (cm)")
+        ax.set_title(title)
+        ax.set_aspect("equal")
+        plt.tight_layout()
+        plt.show()
+
+    def plot_fission_heatmap(self, world_xml=None):
+        """Heatmap of where fission events happened (<fission_tally>).
+        Group mode only; always all-zero for continuous mode.
+        world_xml: optional, overlays grid lines + circle borders."""
+        self._region_heatmap("fission_tally", "fission event heatmap", "hot", world_xml=world_xml)
+
+    def plot_absorption_heatmap(self, world_xml=None):
+        """Heatmap of where (non-fission) absorption happened (<absorp_tally>).
+        Works for both continuous and group mode."""
+        self._region_heatmap("absorp_tally", "absorption event heatmap", "viridis", world_xml=world_xml)

@@ -225,13 +225,13 @@ void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, i
             g = dist_newg(gen);
         } else if (P < Sigma_s + Sigma_a) {
             alive = false;
-            results.add_region_hit(x, y);
+            results.add_absorp_hit(x, y);
         } else {
             // fission: the parent dies here, its children go into the fission bank.
             // position = parent's position, group = parent's group,
             // direction = a fresh isotropic direction for EACH child
             alive = false;
-            results.add_region_hit(x, y);
+            results.add_fission_hit(x, y);
 
             int n_children = sample_fission_neutrons(nu.at(cur_mat.symbol)[g]);
             for (int k = 0; k < n_children; ++k) {

@@ -162,7 +162,7 @@ class World:
                    keeping the population size fixed at N every generation
                    regardless of whether the system is sub/super/critical.
                    Default 1 = a single generation -- any fission products are
-                   left sitting in the bank, uncounted beyond the region tally
+                   left sitting in the bank, uncounted beyond the fission tally
                    (see below), never transported. Ignored (must stay 1) for
                    mode="continuous", which has no concept of generations.
         resolution : resolution of the RESULT's region-based tally grid -- a
