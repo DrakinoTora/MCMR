@@ -43,7 +43,8 @@ void export_to_xml(const Tally& tally, const std::string& filename) {
 
     f << "  <trajectories>\n";
     for (size_t i = 0; i < tally.x_history.size(); ++i) {
-        f << "    <particle_history id=\"" << i << "\">\n";
+        int gen_tag = (i < tally.history_generation.size()) ? tally.history_generation[i] : 1;
+        f << "    <particle_history id=\"" << i << "\" generation=\"" << gen_tag << "\">\n";
         f << "      <x>";
         for (size_t j = 0; j < tally.x_history[i].size(); ++j) {
             f << tally.x_history[i][j] << (j + 1 == tally.x_history[i].size() ? "" : ",");

@@ -229,15 +229,17 @@ void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, i
             int n_children = sample_fission_neutrons(nu.at(cur_mat.symbol)[g]);
             for (int k = 0; k < n_children; ++k) {
                 double child_phi = dist_phi(gen);
-                fission_bank.push_back({x, y, std::cos(child_phi), std::sin(child_phi), g, save_history});
+                fission_bank.push_back({x, y, std::cos(child_phi), std::sin(child_phi), g});
             }
         }
     }
 }
 
-void SimulationMG::run() {
+void SimulationMG::run(int n_gen) {
     if (n_groups <= 0)
         throw std::invalid_argument("set_group_data() must be called before run()");
+    if (n_gen <= 0)
+        throw std::invalid_argument("n_gen must be positive");
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -258,19 +260,22 @@ void SimulationMG::run() {
 
     py::print("====================================================");
     py::print(" MCMR Simulation Engine (multi-group)");
-    py::print(" Total Particle   :", N_particles);
-    py::print(" Number of Groups :", n_groups);
+    py::print(" Particles / Generation :", N_particles);
+    py::print(" Generations            :", n_gen);
+    py::print(" Number of Groups       :", n_groups);
     py::print("====================================================");
     py::print("running...");
     py::module_::import("sys").attr("stdout").attr("flush")();
 
     const int ny = grid.ny();
 
-    // Progress line: [source particle in progress / N] + current fission bank size.
-    // Throttled by time (not by particle count) because a supercritical run can sit on ONE
-    // source particle forever -- the bank size is what tells the user that is happening.
+    // Progress line: current generation + source particle in progress / N + current
+    // fission bank size (children accumulated so far THIS generation). Throttled by
+    // time (not by particle count) because a supercritical run can sit on one
+    // neutron's collision chain for a while -- the bank size is what tells the
+    // user something is still happening.
     auto last_print = std::chrono::steady_clock::now();
-    auto print_progress = [&](int current, bool force) {
+    auto print_progress = [&](int current, int gen_idx, bool force) {
         auto now = std::chrono::steady_clock::now();
         if (!force && now - last_print < std::chrono::milliseconds(100)) return;
         last_print = now;
@@ -283,96 +288,105 @@ void SimulationMG::run() {
             : 100;
 
         std::stringstream ss;
-        ss << "\rProgress: [" << current << "/" << N_particles << "] (" << percent << "%)"
+        ss << "\rGen " << gen_idx << "/" << n_gen
+           << " | Particle: [" << current << "/" << N_particles << "] (" << percent << "%)"
            << " | Fission bank: " << fission_bank.size() << "      ";  // trailing spaces wipe a longer old line
 
         py::print(ss.str(), py::arg("end") = "");
         py::module_::import("sys").attr("stdout").attr("flush")();
     };
 
-    for (int p = 0; p < N_particles; ++p) {
-        print_progress(p + 1, p == 0);
+    // this generation's population, transported one by one below. Generation 1:
+    // sampled from the spatial/group source distribution. Generation >1: N_particles
+    // draws WITH REPLACEMENT from the previous generation's fission_bank (a fixed
+    // population size regardless of whether the system is sub/super/critical).
+    std::vector<BankedNeutron> population;
+    population.reserve(N_particles);
 
-        bool save_history = p < max_history_save;
-        std::vector<double> h_x, h_y;
+    int gen_idx = 1;
+    for (; gen_idx <= n_gen; ++gen_idx) {
+        population.clear();
 
-        int flat_idx = region_picker(gen);
-        double x, y;
-        int ix, iy;
+        if (gen_idx == 1) {
+            for (int i = 0; i < N_particles; ++i) {
+                int flat_idx = region_picker(gen);
+                double x, y;
 
-        if (flat_idx < n_grid_cells) {
-            ix = flat_idx / ny;
-            iy = flat_idx % ny;
-            const Region& r = grid.region_at(ix, iy);
-            x = r.x1 + dist_R(gen) * (r.x2 - r.x1);
-            y = r.y1 + dist_R(gen) * (r.y2 - r.y1);
+                if (flat_idx < n_grid_cells) {
+                    int gix = flat_idx / ny;
+                    int giy = flat_idx % ny;
+                    const Region& r = grid.region_at(gix, giy);
+                    x = r.x1 + dist_R(gen) * (r.x2 - r.x1);
+                    y = r.y1 + dist_R(gen) * (r.y2 - r.y1);
+                } else {
+                    const CircleRegion& c = grid.circle_at_index(flat_idx - n_grid_cells);
+                    double u = dist_R(gen);
+                    double theta = dist_phi(gen);
+                    double rr = c.r * std::sqrt(u); // uniform over the disk area
+                    x = c.cx + rr * std::cos(theta);
+                    y = c.cy + rr * std::sin(theta);
+                }
+
+                double phi = dist_phi(gen);
+                int g = dist_g0(gen); // group born uniformly
+                population.push_back({x, y, std::cos(phi), std::sin(phi), g});
+            }
         } else {
-            const CircleRegion& c = grid.circle_at_index(flat_idx - n_grid_cells);
-            double u = dist_R(gen);
-            double theta = dist_phi(gen);
-            double rr = c.r * std::sqrt(u); // uniform over the disk area, see region-sampling note
-            x = c.cx + rr * std::cos(theta);
-            y = c.cy + rr * std::sin(theta);
-            grid.find_index(x, y, ix, iy);
-        }
-
-        double phi = dist_phi(gen);
-        double mu_x = std::cos(phi);
-        double mu_y = std::sin(phi);
-        int g = dist_g0(gen); // group born uniformly
-        results.G_born.push_back(g);
-
-        if (save_history) { h_x.push_back(x); h_y.push_back(y); }
-
-        transport_one(x, y, mu_x, mu_y, g, ix, iy, gen,
-                      save_history ? &h_x : nullptr,
-                      save_history ? &h_y : nullptr);
-
-        // trajectories are saved for source particles only (max_history_save keeps its meaning)
-        if (save_history) {
-            results.x_history.push_back(h_x);
-            results.y_history.push_back(h_y);
-        }
-
-        // Fission bank: do NOT move on to the next source particle until the bank is empty.
-        // Banked neutrons are transported exactly like any other neutron; a fission in here
-        // just appends more members to this same queue.
-        //
-        // Trajectory bookkeeping: a banked neutron gets its OWN <particle_history> entry
-        // (starting at its birth/fission position) iff n.save_history is true -- i.e. it
-        // descends from one of the max_history_save source particles whose trajectory was
-        // being recorded. This is IN ADDITION TO the max_history_save cap, not counted
-        // against it: e.g. max_save=100, and among those 100 source particles, 10 fission
-        // into 3 children each -> 100 + 30 = 130 entries in <trajectories>.
-        while (!fission_bank.empty()) {
-            print_progress(p + 1, false);
-
-            BankedNeutron n = fission_bank.front();  // copy first: transport_one() pushes to the bank
-            fission_bank.pop_front();
-
-            int bix, biy;
-            grid.find_index(n.x, n.y, bix, biy);
-
-            if (n.save_history) {
-                std::vector<double> ch_x, ch_y;
-                ch_x.push_back(n.x);
-                ch_y.push_back(n.y);
-                transport_one(n.x, n.y, n.mu_x, n.mu_y, n.g, bix, biy, gen, &ch_x, &ch_y);
-                results.x_history.push_back(ch_x);
-                results.y_history.push_back(ch_y);
-            } else {
-                transport_one(n.x, n.y, n.mu_x, n.mu_y, n.g, bix, biy, gen, nullptr, nullptr);
+            if (fission_bank.empty()) {
+                py::print("\nChain died out before generation", gen_idx,
+                           "(no fissions in the previous generation) -- stopping early.");
+                py::module_::import("sys").attr("stdout").attr("flush")();
+                break;
+            }
+            std::uniform_int_distribution<size_t> dist_bank(0, fission_bank.size() - 1);
+            for (int i = 0; i < N_particles; ++i) {
+                const BankedNeutron& src = fission_bank[dist_bank(gen)]; // WITH replacement
+                double phi = dist_phi(gen); // fresh isotropic direction for each draw
+                population.push_back({src.x, src.y, std::cos(phi), std::sin(phi), src.g});
             }
         }
-    }
 
-    print_progress(N_particles, true);
+        // this generation's bank has now been fully folded into `population` (or,
+        // for generation 1, was already empty) -- clear it so it only accumulates
+        // THIS generation's fresh fission events from here on
+        fission_bank.clear();
+
+        for (int p = 0; p < N_particles; ++p) {
+            print_progress(p + 1, gen_idx, p == 0);
+
+            bool save_history = p < max_history_save;
+            std::vector<double> h_x, h_y;
+
+            const BankedNeutron& sp = population[p];
+            int ix, iy;
+            grid.find_index(sp.x, sp.y, ix, iy);
+
+            results.G_born.push_back(sp.g);
+            if (save_history) { h_x.push_back(sp.x); h_y.push_back(sp.y); }
+
+            transport_one(sp.x, sp.y, sp.mu_x, sp.mu_y, sp.g, ix, iy, gen,
+                          save_history ? &h_x : nullptr,
+                          save_history ? &h_y : nullptr);
+
+            // trajectory saving resets every generation: the first max_history_save
+            // particles OF EACH GENERATION get their own entry, tagged with gen_idx
+            if (save_history) {
+                results.x_history.push_back(h_x);
+                results.y_history.push_back(h_y);
+                results.history_generation.push_back(gen_idx);
+            }
+        }
+
+        print_progress(N_particles, gen_idx, true);
+        py::print(""); // keep each generation's final progress line on screen
+        py::module_::import("sys").attr("stdout").attr("flush")();
+    }
 
     auto end_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff = end_time - start_time;
     results.time_taken = diff.count();
 
-    py::print("\n====================================================");
+    py::print("====================================================");
     std::stringstream ss_end;
     ss_end << " Simulation End in " << std::fixed << std::setprecision(4) << results.time_taken << " seconds.";
     py::print(ss_end.str());

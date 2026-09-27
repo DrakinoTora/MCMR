@@ -2,7 +2,6 @@
 #include "region.hpp"
 #include "material.hpp"
 #include "tally.hpp"
-#include <deque>
 #include <map>
 #include <random>
 #include <string>
@@ -18,25 +17,38 @@
 //   - fission: the parent dies (tallied in fission_by_material) and
 //     sample_fission_neutrons(nu[g]) children are pushed into fission_bank:
 //     same position and same group as the parent, each with its own
-//     isotropic direction. run() never starts the next source particle
-//     while the bank is not empty -- it transports the banked neutrons
-//     first (exactly like any other neutron; a fission there just appends
-//     more members to the same bank). A supercritical setup therefore never
-//     finishes, which is why run() prints the bank size next to the progress.
+//     isotropic direction.
+//
+// GENERATIONS (power iteration / fission-source cycling, standard technique
+// for k-eigenvalue problems): run(n_gen) processes n_gen generations, each
+// with a FIXED population of N_particles neutrons.
+//   - Generation 1: population sampled from the user-specified spatial/group
+//     source distribution (exactly like the single-generation run used to).
+//   - Generation g>1: population is N_particles draws WITH REPLACEMENT from
+//     the fission_bank accumulated during generation g-1 (a bank member can
+//     be picked more than once, or not at all) -- each draw keeps the bank
+//     entry's birth position and group, but gets its own fresh isotropic
+//     direction. This keeps the simulated population size constant across
+//     generations regardless of whether the system is sub/super/critical.
+//   - Within a generation, a fission does NOT get transported immediately --
+//     it only appends children to fission_bank. All N_particles of the
+//     current generation are transported first; the bank then becomes next
+//     generation's source, and is cleared once population is drawn from it.
+//   - If a generation's bank turns out empty (the whole population died out:
+//     no fission anywhere), run() stops early -- there's nothing to sample
+//     the next generation's population from.
+//   - Trajectory saving (max_history_save) resets every generation: the
+//     first max_history_save particles OF EACH GENERATION get a
+//     <particle_history> entry, tagged with that generation's number.
 class SimulationMG {
 private:
-    // neutron born from fission, waiting in fission_bank to be transported.
-    // save_history: true iff this child descends from one of the first
-    // max_history_save SOURCE particles -- propagated from parent to child at
-    // every fission, so it can chain through multiple generations. Determines
-    // whether THIS neutron gets its own <particle_history> entry, independent
-    // of max_history_save (fission trajectories are recorded IN ADDITION TO
-    // the max_history_save source trajectories, not counted against that cap).
+    // a neutron ready to be transported: either one of this generation's
+    // sampled source particles, or (before being resampled into the next
+    // generation's population) a fission product waiting in fission_bank.
     struct BankedNeutron {
         double x, y;
         double mu_x, mu_y;
         int g;
-        bool save_history;
     };
 
     int N_particles;
@@ -53,7 +65,10 @@ private:
     std::map<std::string, std::vector<double>> sigma_f;
     std::map<std::string, std::vector<double>> nu;
 
-    std::deque<BankedNeutron> fission_bank;  // FIFO queue
+    // fission products accumulated during the CURRENT generation, to be
+    // resampled (with replacement) into next generation's population. No
+    // longer a FIFO -- cleared and rebuilt fresh every generation.
+    std::vector<BankedNeutron> fission_bank;
 
     Tally results;
 
@@ -88,7 +103,14 @@ public:
         const std::map<std::string, std::vector<double>>& nu_
     );
 
-    void run();
+    // n_gen: number of generations to cycle through (see the class comment
+    // above for what a generation is). Default 1 = a single generation
+    // sourced from the user-specified spatial/group distribution -- any
+    // fission products are left sitting unresampled in fission_bank once
+    // run() returns (accessible only indirectly, through fission_by_material's
+    // count; they are NOT transported). Pass n_gen>1 to cycle the fission
+    // source across generations (power iteration).
+    void run(int n_gen = 1);
     void export_xml(const std::string& filename = "mcmr_results_mg.xml");
 
     Tally get_tally() const { return results; }

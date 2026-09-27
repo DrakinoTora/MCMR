@@ -5,7 +5,7 @@
     <x_grid>8,16,24,32,40,48,56</x_grid>
     <y_grid>8,16,24,32,40,48,56</y_grid>
   </grid>
-  <boundary top="reflective" bottom="reflective" left="reflective" right="reflective" />
+  <boundary top="vacuum" bottom="vacuum" left="vacuum" right="vacuum" />
   <materials>
     <row index="0">Fe,Fe,Fe,Fe,Fe,Fe,Fe,Fe</row>
     <row index="1">Fe,Fe,Fe,Fe,Fe,Fe,Fe,Fe</row>

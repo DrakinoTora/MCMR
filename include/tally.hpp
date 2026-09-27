@@ -18,4 +18,8 @@ struct Tally {
 
     std::vector<std::vector<double>> x_history;
     std::vector<std::vector<double>> y_history;
+    // parallel to x_history/y_history: which generation (1-based) that
+    // particle_history entry belongs to. Group mode only -- always empty
+    // for continuous mode (single generation, no concept of "gen").
+    std::vector<int> history_generation;
 };

@@ -29,7 +29,8 @@ PYBIND11_MODULE(_mcmr_cpp, m) {
         .def_readonly("G_born", &Tally::G_born)
         .def_readonly("G_leak", &Tally::G_leak)
         .def_readonly("x_history", &Tally::x_history)
-        .def_readonly("y_history", &Tally::y_history);
+        .def_readonly("y_history", &Tally::y_history)
+        .def_readonly("history_generation", &Tally::history_generation);
 
     py::class_<Simulation>(m, "Simulation")
         .def(py::init<int, double, double,
@@ -101,7 +102,7 @@ PYBIND11_MODULE(_mcmr_cpp, m) {
         .def("set_group_data", &SimulationMG::set_group_data,
             py::arg("n_groups"), py::arg("sigma_t"), py::arg("sigma_s"),
             py::arg("sigma_f"), py::arg("nu"))
-        .def("run", &SimulationMG::run)
+        .def("run", &SimulationMG::run, py::arg("n_gen") = 1)
         .def("export_xml", &SimulationMG::export_xml, py::arg("filename") = "mcmr_results_mg.xml")
         .def("get_tally", &SimulationMG::get_tally);
 }

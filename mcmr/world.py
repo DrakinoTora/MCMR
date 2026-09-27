@@ -142,7 +142,7 @@ class World:
     # ------------------------------------------------------------------ #
     # Run simulation
     # ------------------------------------------------------------------ #
-    def run(self, N, max_save=50, mode="continuous", group_materials=None):
+    def run(self, N, max_save=50, mode="continuous", group_materials=None, n_gen=1):
         """Run the Monte Carlo simulation for this world. Returns a Simulation
         (or SimulationMG) object, already .run().
 
@@ -154,6 +154,17 @@ class World:
         group_materials : required when mode="group". A mcmr.MaterialLibrary
                    holding a mcmr.GroupMaterial for every material name used
                    in this world's material_matrix / circles.
+        n_gen    : mode="group" only. Number of generations to cycle through
+                   (power iteration / fission-source cycling): generation 1's
+                   N particles are born from the source distribution as usual;
+                   generation 2+'s N particles are resampled WITH REPLACEMENT
+                   from the fission products the previous generation produced,
+                   keeping the population size fixed at N every generation
+                   regardless of whether the system is sub/super/critical.
+                   Default 1 = a single generation -- any fission products are
+                   left sitting in the bank, uncounted beyond
+                   fission_by_material, never transported. Ignored (must stay
+                   1) for mode="continuous", which has no concept of generations.
 
         [row][col] index convention for material_matrix / sources: row=0 is the
         TOPMOST row (highest y), col=0 is the LEFTMOST column (x=0) -- written
@@ -166,8 +177,10 @@ class World:
             raise ValueError(f"mode must be 'continuous' or 'group', got {mode!r}")
 
         if mode == "continuous":
+            if n_gen != 1:
+                raise ValueError("n_gen only applies to mode='group' (continuous has no generations)")
             return self._run_continuous(N, max_save)
-        return self._run_group(N, max_save, group_materials)
+        return self._run_group(N, max_save, group_materials, n_gen)
 
     def _run_continuous(self, N, max_save):
         from ._mcmr_cpp import Simulation
@@ -191,7 +204,7 @@ class World:
         sim.run()
         return sim
 
-    def _run_group(self, N, max_save, group_materials):
+    def _run_group(self, N, max_save, group_materials, n_gen=1):
         from ._mcmr_cpp import SimulationMG, canonical_material_name
 
         if group_materials is None:
@@ -249,7 +262,7 @@ class World:
             bc_top=self.bc_top, bc_bot=self.bc_bot, bc_left=self.bc_left, bc_right=self.bc_right,
         )
         sim.set_group_data(group_materials.n_groups, sigma_t, sigma_s, sigma_f, nu)
-        sim.run()
+        sim.run(n_gen)
         return sim
 
     # ------------------------------------------------------------------ #
