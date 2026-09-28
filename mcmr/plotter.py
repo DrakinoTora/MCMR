@@ -196,3 +196,45 @@ class ResultsPlotter:
         """Heatmap of where (non-fission) absorption happened (<absorp_tally>).
         Works for both continuous and group mode."""
         self._region_heatmap("absorp_tally", "absorption event heatmap", "viridis", world_xml=world_xml)
+
+    def plot_k_generations(self, skip=None):
+        """Plot k per generation (<k_generations>, group mode only).
+
+        Draws k_estimate vs generation number, with a k = 1 (critical) reference
+        line and the initial k the first generation divided nu by (k_used of
+        generation 1) as a hollow marker at generation 0.
+
+        skip : optional int. If given, the first `skip` generations are treated as
+                inactive/warm-up and a dashed line shows the mean k_estimate of the
+                remaining generations (with the mean +/- std in the legend).
+        """
+        el = self.root.find(".//k_generations")
+        gens = el.findall("generation") if el is not None else []
+        if not gens:
+            print("[mcmr] Note: <k_generations> is empty or missing in this results XML "
+                    "-- k is only recorded by group-mode runs, so there is nothing to plot.")
+            return
+
+        ids = [int(g.get("id")) for g in gens]
+        k_used = [float(g.get("k_used")) for g in gens]
+        k_est = [float(g.get("k_estimate")) for g in gens]
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.axhline(1.0, color="gray", linestyle=":", linewidth=1.2)
+        ax.plot(ids, k_est, "-o", markersize=4, linewidth=1.6, color="#4363d8")
+        #ax.plot([0], [k_used[0]], "o", markerfacecolor="none", color="#4363d8")
+
+        if skip is not None and 0 <= skip < len(k_est):
+            active = np.array(k_est[skip:])
+            mean, std = active.mean(), active.std()
+            ax.axhline(mean, color="#e6194b", linestyle="--", linewidth=1.2)
+            ax.axvspan(0, skip + 0.5, color="gray", alpha=0.12, zorder=0)
+
+        ax.set_xlim(left=-0.5)
+        ax.set_xlabel("Generation")
+        ax.set_ylabel("k")
+        ax.set_title(f"k per generation (final k = {k_est[-1]:.4f})")
+        ax.grid(alpha=0.3)
+        ax.legend()
+        plt.tight_layout()
+        plt.show()
