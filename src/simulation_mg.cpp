@@ -233,7 +233,7 @@ void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, i
             alive = false;
             results.add_fission_hit(x, y);
 
-            int n_children = sample_fission_neutrons(nu.at(cur_mat.symbol)[g]);
+            int n_children = sample_fission_neutrons(nu.at(cur_mat.symbol)[g] / k_current);
             for (int k = 0; k < n_children; ++k) {
                 double child_phi = dist_phi(gen);
                 fission_bank.push_back({x, y, std::cos(child_phi), std::sin(child_phi), g});
@@ -242,11 +242,13 @@ void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, i
     }
 }
 
-void SimulationMG::run(int n_gen) {
+void SimulationMG::run(int n_gen, double k) {
     if (n_groups <= 0)
         throw std::invalid_argument("set_group_data() must be called before run()");
     if (n_gen <= 0)
         throw std::invalid_argument("n_gen must be positive");
+    if (!(k > 0.0))
+        throw std::invalid_argument("k must be positive");
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -258,6 +260,7 @@ void SimulationMG::run(int n_gen) {
     results = Tally{};
     results.init_region_tally(tally_res_x, tally_res_y, grid.world_max_x(), grid.world_max_y());
     fission_bank.clear();
+    k_current = k;
 
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -359,6 +362,9 @@ void SimulationMG::run(int n_gen) {
         // THIS generation's fresh fission events from here on
         fission_bank.clear();
 
+        // the k this generation runs with (recorded in the XML, not printed)
+        results.k_used.push_back(k_current);
+
         for (int p = 0; p < N_particles; ++p) {
             print_progress(p + 1, gen_idx, p == 0);
 
@@ -386,6 +392,17 @@ void SimulationMG::run(int n_gen) {
         }
 
         print_progress(N_particles, gen_idx, true);
+
+        // k estimate of this generation. The bank was produced with nu/k_used,
+        // so bank/N alone measures k_true/k_used; multiplying by k_used undoes
+        // the division and recovers k_true. (Using bank/N directly as the next k
+        // makes k oscillate between k_true and ~1 instead of converging.)
+        // It becomes the k the NEXT generation divides nu by.
+        // (If the bank is empty the next iteration stops early before k_current
+        // is ever used, so keep the old value instead of dividing by 0.)
+        double k_est = k_current * static_cast<double>(fission_bank.size()) / N_particles;
+        results.k_estimate.push_back(k_est);
+        if (k_est > 0.0) k_current = k_est;
     }
 
     auto end_time = std::chrono::high_resolution_clock::now();

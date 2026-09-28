@@ -63,6 +63,14 @@ void export_to_xml(const Tally& tally, const std::string& filename) {
     }
     f << "\n  </group_leak>\n";
 
+    // per-generation k (group mode only; empty block for continuous)
+    f << "  <k_generations>\n";
+    for (size_t i = 0; i < tally.k_used.size(); ++i) {
+        f << "    <generation id=\"" << (i + 1) << "\" k_used=\"" << tally.k_used[i]
+          << "\" k_estimate=\"" << tally.k_estimate[i] << "\"/>\n";
+    }
+    f << "  </k_generations>\n";
+
     f << "  <trajectories>\n";
     for (size_t i = 0; i < tally.x_history.size(); ++i) {
         int gen_tag = (i < tally.history_generation.size()) ? tally.history_generation[i] : 1;

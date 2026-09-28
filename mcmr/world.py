@@ -142,7 +142,7 @@ class World:
     # ------------------------------------------------------------------ #
     # Run simulation
     # ------------------------------------------------------------------ #
-    def run(self, N, max_save=10, mode="continuous", group_materials=None, n_gen=1, resolution=None):
+    def run(self, N, max_save=10, mode="continuous", group_materials=None, n_gen=1, resolution=None, k=1.0):
         """Run the Monte Carlo simulation for this world. Returns a Simulation
         (or SimulationMG) object, already .run().
 
@@ -165,6 +165,14 @@ class World:
                    left sitting in the bank, uncounted beyond the fission tally
                    (see below), never transported. Ignored (must stay 1) for
                    mode="continuous", which has no concept of generations.
+        k        : mode="group" only. Initial multiplication factor for
+                   generation 1 (default 1.0). Every fission samples its
+                   neutron count from nu/k instead of nu. After each generation
+                   k is replaced by k * (fission bank size / N) measured in
+                   that generation, and used for the next (converges to the
+                   system's actual k). Each generation's k is
+                   recorded in the results XML (<k_generations>), not printed.
+                   Must stay 1.0 for mode="continuous" (no fission there).
         resolution : resolution of the RESULT's region-based tally grid -- a
                    grid laid independently over the whole world (NOT tied to
                    material_matrix/x_grid/y_grid at all). Every time a
@@ -193,11 +201,16 @@ class World:
 
         res_x, res_y = self._resolve_resolution(resolution)
 
+        if not k > 0:
+            raise ValueError(f"k must be positive, got {k!r}")
+
         if mode == "continuous":
+            if k != 1.0:
+                raise ValueError("k only applies to mode='group' (continuous has no fission)")
             if n_gen != 1:
                 raise ValueError("n_gen only applies to mode='group' (continuous has no generations)")
             return self._run_continuous(N, max_save, res_x, res_y)
-        return self._run_group(N, max_save, group_materials, n_gen, res_x, res_y)
+        return self._run_group(N, max_save, group_materials, n_gen, res_x, res_y, k)
 
     def _resolve_resolution(self, resolution):
         """Resolve run()'s `resolution` argument into a concrete (res_x, res_y)
@@ -241,7 +254,7 @@ class World:
         sim.run()
         return sim
 
-    def _run_group(self, N, max_save, group_materials, n_gen, res_x, res_y):
+    def _run_group(self, N, max_save, group_materials, n_gen, res_x, res_y, k=1.0):
         from ._mcmr_cpp import SimulationMG, canonical_material_name
 
         if group_materials is None:
@@ -300,7 +313,7 @@ class World:
             bc_top=self.bc_top, bc_bot=self.bc_bot, bc_left=self.bc_left, bc_right=self.bc_right,
         )
         sim.set_group_data(group_materials.n_groups, sigma_t, sigma_s, sigma_f, nu)
-        sim.run(n_gen)
+        sim.run(n_gen, k)
         return sim
 
     # ------------------------------------------------------------------ #

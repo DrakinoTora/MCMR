@@ -19,6 +19,16 @@ struct Tally {
     // for continuous mode (single generation, no concept of "gen").
     std::vector<int> history_generation;
 
+    // Group mode only (empty for continuous): one entry per generation that
+    // actually ran.
+    //   k_used[i]     = the k generation i+1 divided nu by (gen 1: run()'s
+    //                   initial k; gen g>1: k_estimate of gen g-1)
+    //   k_estimate[i] = k_used[i] * fission_bank size at the end of
+    //                   generation i+1 / N_particles  (the bank was made with
+    //                   nu/k_used, so this recovers the actual k)
+    std::vector<double> k_used;
+    std::vector<double> k_estimate;
+
     // ------------------------------------------------------------------ //
     // Region-based tally grids: a resolution grid laid independently over the
     // WHOLE WORLD (not tied to material_matrix's grid at all). Fission and

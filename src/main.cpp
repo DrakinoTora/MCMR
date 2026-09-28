@@ -29,6 +29,8 @@ PYBIND11_MODULE(_mcmr_cpp, m) {
         .def_readonly("x_history", &Tally::x_history)
         .def_readonly("y_history", &Tally::y_history)
         .def_readonly("history_generation", &Tally::history_generation)
+        .def_readonly("k_used", &Tally::k_used)
+        .def_readonly("k_estimate", &Tally::k_estimate)
         // Region-based tally grid (replaces the old absorp_by_material /
         // fission_by_material per-material counters): a resolution grid laid
         // independently over the whole world -- every fission/absorption event
@@ -120,7 +122,7 @@ PYBIND11_MODULE(_mcmr_cpp, m) {
         .def("set_group_data", &SimulationMG::set_group_data,
             py::arg("n_groups"), py::arg("sigma_t"), py::arg("sigma_s"),
             py::arg("sigma_f"), py::arg("nu"))
-        .def("run", &SimulationMG::run, py::arg("n_gen") = 1)
+        .def("run", &SimulationMG::run, py::arg("n_gen") = 1, py::arg("k") = 1.0)
         .def("export_xml", &SimulationMG::export_xml, py::arg("filename") = "mcmr_results_mg.xml")
         .def("get_tally", &SimulationMG::get_tally);
 }

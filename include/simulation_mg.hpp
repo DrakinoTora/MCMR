@@ -78,6 +78,11 @@ private:
 
     Tally results;
 
+    // k the CURRENT generation divides nu by (every fission samples
+    // nu / k_current). run() sets it to its initial k for generation 1, then to
+    // k_current * fission_bank.size() / N_particles at the end of each generation.
+    double k_current = 1.0;
+
     // transport ONE neutron until it dies (leak / capture / fission).
     // h_x / h_y: trajectory is recorded into them, pass nullptr to not record.
     void transport_one(double x, double y, double mu_x, double mu_y, int g, int ix, int iy,
@@ -119,7 +124,12 @@ public:
     // region tally; the children themselves are NOT transported). Pass
     // n_gen>1 to cycle the fission
     // source across generations (power iteration).
-    void run(int n_gen = 1);
+    //
+    // k: initial multiplication factor for generation 1 (default 1.0). Every
+    // fission samples sample_fission_neutrons(nu / k_current); after each
+    // generation k_current becomes k_current * fission_bank.size() /
+    // N_particles for the next one (converges to the actual k). Each generation's k is recorded in Tally::k_used / k_estimate.
+    void run(int n_gen = 1, double k = 1.0);
     void export_xml(const std::string& filename = "mcmr_results_mg.xml");
 
     Tally get_tally() const { return results; }

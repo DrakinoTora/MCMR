@@ -3,14 +3,14 @@
   <material name="Fe">
     <sigma_t>0.5</sigma_t>
     <sigma_s>0.3</sigma_s>
-    <sigma_f>0.05</sigma_f>
+    <sigma_f>0.1</sigma_f>
     <nu>2.7</nu>
   </material>
   <material name="C">
-    <sigma_t>0.4</sigma_t>
-    <sigma_s>0.35</sigma_s>
-    <sigma_f>0.01</sigma_f>
-    <nu>2.7</nu>
+    <sigma_t>0.7</sigma_t>
+    <sigma_s>0.6</sigma_s>
+    <sigma_f>0.05</sigma_f>
+    <nu>2.3</nu>
   </material>
   <material name="Pb">
     <sigma_t>0.6</sigma_t>
