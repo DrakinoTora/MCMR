@@ -8,6 +8,7 @@ void export_to_xml(const Tally& tally, const std::string& filename) {
     f << "<mcmr_results>\n";
     f << "  <summary>\n";
     f << "    <transmission>" << tally.transmission << "</transmission>\n";
+    f << "    <seed>" << tally.seed << "</seed>\n";
     f << "    <time_taken_seconds>" << tally.time_taken << "</time_taken_seconds>\n";
     f << "  </summary>\n";
 

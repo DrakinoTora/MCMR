@@ -3,6 +3,8 @@
 #include "region.hpp"
 #include "material.hpp"
 #include "tally.hpp"
+#include <cstdint>
+#include <optional>
 #include <map>
 #include <string>
 #include <vector>
@@ -56,7 +58,9 @@ public:
         const std::map<int, std::vector<double>>& Sig_scat
     );
 
-    void run();
+    // seed: fixed 64-bit seed -> identical results every time (same build/platform).
+    // Empty -> a random seed is drawn; it is recorded in get_tally().seed.
+    void run(std::optional<std::uint64_t> seed = std::nullopt);
     void export_xml(const std::string& filename = "mcmr_results.xml");
 
     Tally get_tally() const { return results; }

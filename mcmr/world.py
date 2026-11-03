@@ -142,7 +142,7 @@ class World:
     # ------------------------------------------------------------------ #
     # Run simulation
     # ------------------------------------------------------------------ #
-    def run(self, N, max_save=10, mode="continuous", group_materials=None, n_gen=1, resolution=None, k=1.0):
+    def run(self, N, max_save=10, mode="continuous", group_materials=None, n_gen=1, resolution=None, k=1.0, seed=None):
         """Run the Monte Carlo simulation for this world. Returns a Simulation
         (or SimulationMG) object, already .run().
 
@@ -173,6 +173,15 @@ class World:
                    system's actual k). Each generation's k is
                    recorded in the results XML (<k_generations>), not printed.
                    Must stay 1.0 for mode="continuous" (no fission there).
+        seed     : None (default) or a non-negative int < 2**64. With a fixed seed
+                   the same world + same arguments reproduce EXACTLY the same
+                   results (same build/platform) -- every random draw (birth
+                   position, direction, Watt energy, collisions, fission
+                   counts, generation resampling) comes from one generator
+                   built from it. With None a fresh random seed is drawn; the
+                   seed actually used is always available afterwards as
+                   sim.get_tally().seed (and in the results XML), so any run
+                   can be repeated by passing that value back as seed=.
         resolution : resolution of the RESULT's region-based tally grid -- a
                    grid laid independently over the whole world (NOT tied to
                    material_matrix/x_grid/y_grid at all). Every time a
@@ -200,6 +209,7 @@ class World:
             raise ValueError(f"mode must be 'continuous' or 'group', got {mode!r}")
 
         res_x, res_y = self._resolve_resolution(resolution)
+        seed = self._validate_seed(seed)
 
         if not k > 0:
             raise ValueError(f"k must be positive, got {k!r}")
@@ -209,8 +219,20 @@ class World:
                 raise ValueError("k only applies to mode='group' (continuous has no fission)")
             if n_gen != 1:
                 raise ValueError("n_gen only applies to mode='group' (continuous has no generations)")
-            return self._run_continuous(N, max_save, res_x, res_y)
-        return self._run_group(N, max_save, group_materials, n_gen, res_x, res_y, k)
+            return self._run_continuous(N, max_save, res_x, res_y, seed)
+        return self._run_group(N, max_save, group_materials, n_gen, res_x, res_y, k, seed)
+
+    @staticmethod
+    def _validate_seed(seed):
+        """None passes through (C++ draws a random seed); otherwise must be an
+        int in [0, 2**64). bool/float are rejected rather than silently coerced."""
+        if seed is None:
+            return None
+        if isinstance(seed, bool) or not isinstance(seed, int):
+            raise TypeError(f"seed must be None or an int, got {type(seed).__name__}")
+        if not 0 <= seed < 2 ** 64:
+            raise ValueError(f"seed must be in [0, 2**64), got {seed}")
+        return seed
 
     def _resolve_resolution(self, resolution):
         """Resolve run()'s `resolution` argument into a concrete (res_x, res_y)
@@ -231,7 +253,7 @@ class World:
             raise ValueError(f"resolution must be positive, got ({res_x}, {res_y})")
         return res_x, res_y
 
-    def _run_continuous(self, N, max_save, res_x, res_y):
+    def _run_continuous(self, N, max_save, res_x, res_y, seed=None):
         from ._mcmr_cpp import Simulation
         from .cross_section import load_all_materials
 
@@ -251,10 +273,10 @@ class World:
         E_tot, Sig_tot, E_scat, Sig_scat = load_all_materials()
         sim.set_cross_sections(E_tot, Sig_tot, E_scat, Sig_scat)
 
-        sim.run()
+        sim.run(seed)
         return sim
 
-    def _run_group(self, N, max_save, group_materials, n_gen, res_x, res_y, k=1.0):
+    def _run_group(self, N, max_save, group_materials, n_gen, res_x, res_y, k=1.0, seed=None):
         from ._mcmr_cpp import SimulationMG, canonical_material_name
 
         if group_materials is None:
@@ -313,7 +335,7 @@ class World:
             bc_top=self.bc_top, bc_bot=self.bc_bot, bc_left=self.bc_left, bc_right=self.bc_right,
         )
         sim.set_group_data(group_materials.n_groups, sigma_t, sigma_s, sigma_f, nu)
-        sim.run(n_gen, k)
+        sim.run(n_gen, k, seed)
         return sim
 
     # ------------------------------------------------------------------ #

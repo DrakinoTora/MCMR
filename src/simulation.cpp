@@ -1,5 +1,6 @@
 #include "simulation.hpp"
 #include "physics.hpp"
+#include "rng.hpp"
 #include "exporter.hpp"
 #include <algorithm>
 #include <chrono>
@@ -100,17 +101,19 @@ void Simulation::set_cross_sections(
     Sig_data_scatter = Sig_scat;
 }
 
-void Simulation::run() {
+void Simulation::run(std::optional<std::uint64_t> seed) {
     // Reset any state left over from a PREVIOUS run() call on this same object
     // (results, saved-history buffers) so calling run() twice doesn't silently
     // accumulate two runs' worth of particles into one Tally.
     results = Tally{};
+    results.seed = resolve_seed(seed);
     results.init_region_tally(tally_res_x, tally_res_y, grid.world_max_x(), grid.world_max_y());
 
     py::print("====================================================");
     py::print("              MCMR Simulation Engine               ");
     py::print("====================================================");
     py::print(" Total Particle   :", N_particles);
+    py::print(" Seed             :", results.seed);
     py::print("====================================================");
     py::print("running...");
 
@@ -118,7 +121,7 @@ void Simulation::run() {
 
     auto start_time = std::chrono::high_resolution_clock::now();
 
-    std::mt19937 gen(1337);
+    std::mt19937 gen = make_rng(results.seed);
     std::uniform_real_distribution<double> dist_phi(0.0, 2.0 * M_PI);
     std::uniform_real_distribution<double> dist_R(0.0, 1.0);
 
@@ -175,7 +178,7 @@ void Simulation::run() {
         double phi = dist_phi(gen);
         double mu_x = std::cos(phi);
         double mu_y = std::sin(phi);
-        double E = watt_sample_single();
+        double E = watt_sample_single(gen);
 
         results.E_born.push_back(E);
 

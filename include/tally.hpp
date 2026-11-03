@@ -1,10 +1,12 @@
 #pragma once
+#include <cstdint>
 #include <vector>
 #include <string>
 
 struct Tally {
     int transmission = 0; // world leak
     double time_taken = 0.0;
+    std::uint64_t seed = 0; // seed the run actually used (given, or drawn at random) -> pass it back as seed= to repeat the run exactly
 
     std::vector<double> E_born;  // continuous mode only -- birth energy (eV) per source particle
     std::vector<double> E_leak;  // continuous mode only -- leak energy (eV), len == transmission

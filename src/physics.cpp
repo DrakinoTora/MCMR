@@ -2,14 +2,11 @@
 #include <cmath>
 #include <random>
 
-static std::random_device rd;
-static std::mt19937 gen(rd());
-
 double watt_spectrum_pdf(double E_MeV) {
     return 0.453 * std::exp(-1.036 * E_MeV) * std::sinh(std::sqrt(2.29 * E_MeV));
 }
 
-double watt_sample_single() {
+double watt_sample_single(std::mt19937& gen) {
     std::uniform_real_distribution<double> dist_E(0.0, 15.0);
     std::uniform_real_distribution<double> dist_Y(0.0, 0.4);
     while (true) {
@@ -30,7 +27,7 @@ double E_scatter(double E, double alpha, double phi) {
     return E * ((1.0 + alpha) + (1.0 - alpha) * std::cos(phi)) / 2.0;
 }
 
-int sample_fission_neutrons(double nu) {
+int sample_fission_neutrons(double nu, std::mt19937& gen) {
     int base = static_cast<int>(std::floor(nu));
     double frac = nu - static_cast<double>(base);
     std::uniform_real_distribution<double> dist_R(0.0, 1.0);

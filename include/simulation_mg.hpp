@@ -2,7 +2,9 @@
 #include "region.hpp"
 #include "material.hpp"
 #include "tally.hpp"
+#include <cstdint>
 #include <map>
+#include <optional>
 #include <random>
 #include <string>
 #include <vector>
@@ -129,7 +131,10 @@ public:
     // fission samples sample_fission_neutrons(nu / k_current); after each
     // generation k_current becomes k_current * fission_bank.size() /
     // N_particles for the next one (converges to the actual k). Each generation's k is recorded in Tally::k_used / k_estimate.
-    void run(int n_gen = 1, double k = 1.0);
+    //
+    // seed: fixed 64-bit seed -> identical results every time (same build/platform).
+    // Empty -> a random seed is drawn; it is recorded in get_tally().seed.
+    void run(int n_gen = 1, double k = 1.0, std::optional<std::uint64_t> seed = std::nullopt);
     void export_xml(const std::string& filename = "mcmr_results_mg.xml");
 
     Tally get_tally() const { return results; }

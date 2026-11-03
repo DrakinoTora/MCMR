@@ -39,6 +39,7 @@ PYBIND11_MODULE(_mcmr_cpp, m) {
         // ix_t=0 = leftmost col/x=0); reshape client-side using tally_nx/tally_ny.
         .def_readonly("fission_tally", &Tally::fission_tally)
         .def_readonly("absorp_tally", &Tally::absorp_tally)
+        .def_readonly("seed", &Tally::seed)
         .def_readonly("tally_nx", &Tally::tally_nx)
         .def_readonly("tally_ny", &Tally::tally_ny)
         .def_readonly("tally_dx", &Tally::tally_dx)
@@ -80,7 +81,7 @@ PYBIND11_MODULE(_mcmr_cpp, m) {
             py::arg("bc_left") = "vacuum",
             py::arg("bc_right") = "vacuum")
         .def("set_cross_sections", &Simulation::set_cross_sections)
-        .def("run", &Simulation::run)
+        .def("run", &Simulation::run, py::arg("seed") = py::none())
         .def("export_xml", &Simulation::export_xml, py::arg("filename") = "mcmr_results.xml")
         .def("get_tally", &Simulation::get_tally);
 
@@ -122,7 +123,7 @@ PYBIND11_MODULE(_mcmr_cpp, m) {
         .def("set_group_data", &SimulationMG::set_group_data,
             py::arg("n_groups"), py::arg("sigma_t"), py::arg("sigma_s"),
             py::arg("sigma_f"), py::arg("nu"))
-        .def("run", &SimulationMG::run, py::arg("n_gen") = 1, py::arg("k") = 1.0)
+        .def("run", &SimulationMG::run, py::arg("n_gen") = 1, py::arg("k") = 1.0, py::arg("seed") = py::none())
         .def("export_xml", &SimulationMG::export_xml, py::arg("filename") = "mcmr_results_mg.xml")
         .def("get_tally", &SimulationMG::get_tally);
 }

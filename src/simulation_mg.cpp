@@ -1,5 +1,6 @@
 #include "simulation_mg.hpp"
 #include "physics.hpp"
+#include "rng.hpp"
 #include "exporter.hpp"
 #include <algorithm>
 #include <chrono>
@@ -233,7 +234,7 @@ void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, i
             alive = false;
             results.add_fission_hit(x, y);
 
-            int n_children = sample_fission_neutrons(nu.at(cur_mat.symbol)[g] / k_current);
+            int n_children = sample_fission_neutrons(nu.at(cur_mat.symbol)[g] / k_current, gen);
             for (int k = 0; k < n_children; ++k) {
                 double child_phi = dist_phi(gen);
                 fission_bank.push_back({x, y, std::cos(child_phi), std::sin(child_phi), g});
@@ -242,7 +243,7 @@ void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, i
     }
 }
 
-void SimulationMG::run(int n_gen, double k) {
+void SimulationMG::run(int n_gen, double k, std::optional<std::uint64_t> seed) {
     if (n_groups <= 0)
         throw std::invalid_argument("set_group_data() must be called before run()");
     if (n_gen <= 0)
@@ -258,12 +259,12 @@ void SimulationMG::run(int n_gen, double k) {
     // neutrons into this one; fission_bank.clear() below already covered
     // that half, results = Tally{} covers the rest).
     results = Tally{};
+    results.seed = resolve_seed(seed);
     results.init_region_tally(tally_res_x, tally_res_y, grid.world_max_x(), grid.world_max_y());
     fission_bank.clear();
     k_current = k;
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    std::mt19937 gen = make_rng(results.seed);
     std::uniform_real_distribution<double> dist_R(0.0, 1.0);
     std::uniform_real_distribution<double> dist_phi(0.0, 2.0 * M_PI);
     std::discrete_distribution<int> region_picker(flat_source_weights.begin(), flat_source_weights.end());
@@ -274,6 +275,7 @@ void SimulationMG::run(int n_gen, double k) {
     py::print(" Particles / Generation :", N_particles);
     py::print(" Generations            :", n_gen);
     py::print(" Number of Groups       :", n_groups);
+    py::print(" Seed                   :", results.seed);
     py::print("====================================================");
     py::print("running...");
     py::module_::import("sys").attr("stdout").attr("flush")();
