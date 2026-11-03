@@ -3,7 +3,7 @@
   <material name="Fe">
     <sigma_t>0.5</sigma_t>
     <sigma_s>0.3</sigma_s>
-    <sigma_f>0.1</sigma_f>
+    <sigma_f>0.19</sigma_f>
     <nu>2.7</nu>
   </material>
   <material name="C">

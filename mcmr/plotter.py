@@ -222,7 +222,7 @@ class ResultsPlotter:
         fig, ax = plt.subplots(figsize=(8, 5))
         ax.axhline(1.0, color="gray", linestyle=":", linewidth=1.2)
         ax.plot(ids, k_est, "-o", markersize=4, linewidth=1.6, color="#4363d8")
-        #ax.plot([0], [k_used[0]], "o", markerfacecolor="none", color="#4363d8")
+        ax.plot([0], [k_used[0]], "o", markerfacecolor="none", color="#4363d8")
 
         if skip is not None and 0 <= skip < len(k_est):
             active = np.array(k_est[skip:])
