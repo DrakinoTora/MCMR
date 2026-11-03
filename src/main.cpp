@@ -20,7 +20,10 @@ PYBIND11_MODULE(_mcmr_cpp, m) {
        "canonical symbol ('Fe'). Raises ValueError if the name is unknown.");
 
     py::class_<Tally>(m, "Tally")
-        .def_readonly("transmission", &Tally::transmission)
+        .def_readonly("leak_left", &Tally::leak_left)
+        .def_readonly("leak_right", &Tally::leak_right)
+        .def_readonly("leak_bottom", &Tally::leak_bottom)
+        .def_readonly("leak_top", &Tally::leak_top)
         .def_readonly("time_taken", &Tally::time_taken)
         .def_readonly("E_born", &Tally::E_born)
         .def_readonly("E_leak", &Tally::E_leak)

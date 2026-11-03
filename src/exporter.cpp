@@ -8,7 +8,12 @@ void export_to_xml(const Tally& tally, const std::string& filename) {
     f << "<?xml version=\"1.0\"?>\n";
     f << "<mcmr_results>\n";
     f << "  <summary>\n";
-    f << "    <transmission>" << tally.transmission << "</transmission>\n";
+    f << "    <leakage>\n";
+    f << "      <left>"   << tally.leak_left   << "</left>\n";
+    f << "      <right>"  << tally.leak_right  << "</right>\n";
+    f << "      <bottom>" << tally.leak_bottom << "</bottom>\n";
+    f << "      <top>"    << tally.leak_top    << "</top>\n";
+    f << "    </leakage>\n";
     f << "    <seed>" << tally.seed << "</seed>\n";
     f << "    <time_taken_seconds>" << tally.time_taken << "</time_taken_seconds>\n";
     f << "  </summary>\n";

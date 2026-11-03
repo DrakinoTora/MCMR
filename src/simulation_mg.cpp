@@ -198,7 +198,13 @@ void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, i
             if (hit_side != Side::None) {
                 BoundaryType bc = grid.bc_for_side(hit_side);
                 if (bc == BoundaryType::Vacuum) {
-                    results.transmission++;
+                    switch (hit_side) {
+                        case Side::Left:   results.leak_left++;   break;
+                        case Side::Right:  results.leak_right++;  break;
+                        case Side::Bottom: results.leak_bottom++; break;
+                        case Side::Top:    results.leak_top++;    break;
+                        default: break;
+                    }
                     results.G_leak.push_back(g);
                     alive = false;
                     break;

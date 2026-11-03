@@ -4,15 +4,22 @@
 #include <string>
 
 struct Tally {
-    int transmission = 0; // world leak
+    // World leakage (vacuum boundaries only), split by which side of the world
+    // the neutron escaped through. Replaces the old single `transmission`
+    // counter -- the total leak is leak_left + leak_right + leak_bottom + leak_top
+    // (= E_leak.size() in continuous mode, G_leak.size() in group mode).
+    int leak_left   = 0;  // escaped through x = 0
+    int leak_right  = 0;  // escaped through x = x_world
+    int leak_bottom = 0;  // escaped through y = 0
+    int leak_top    = 0;  // escaped through y = y_world
     double time_taken = 0.0;
     std::uint64_t seed = 0; // seed the run actually used (given, or drawn at random) -> pass it back as seed= to repeat the run exactly
 
     std::vector<double> E_born;  // continuous mode only -- birth energy (eV) per source particle
-    std::vector<double> E_leak;  // continuous mode only -- leak energy (eV), len == transmission
+    std::vector<double> E_leak;  // continuous mode only -- leak energy (eV), one entry per leaked neutron (all 4 sides)
 
     std::vector<int> G_born;     // group mode only -- birth group index per source particle
-    std::vector<int> G_leak;     // group mode only -- leak group index, len == transmission
+    std::vector<int> G_leak;     // group mode only -- leak group index, one entry per leaked neutron (all 4 sides)
 
     std::vector<std::vector<double>> x_history;
     std::vector<std::vector<double>> y_history;
