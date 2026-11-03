@@ -5,7 +5,7 @@
     <x_grid>8,16,24,32,40,48,56</x_grid>
     <y_grid>8,16,24,32,40,48,56</y_grid>
   </grid>
-  <boundary top="vacuum" bottom="vacuum" left="vacuum" right="vacuum" />
+  <boundary top="reflective" bottom="reflective" left="reflective" right="reflective" />
   <materials>
     <row index="0">C,C,C,C,C,C,C,C</row>
     <row index="1">C,C,C,C,C,C,C,C</row>

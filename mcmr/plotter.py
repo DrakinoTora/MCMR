@@ -128,7 +128,7 @@ class ResultsPlotter:
         plt.tight_layout()
         plt.show()
     
-    def _region_heatmap(self, tag, title, cmap, world_xml=None):
+    def _region_heatmap(self, tag, title, cmap, world_xml=None, cbar_label="Event count"):
         el = self.root.find(f".//{tag}")
         if el is None:
             raise ValueError(
@@ -143,7 +143,9 @@ class ResultsPlotter:
         dy = float(el.get("dy"))
         rows = el.findall("row")
         # <row index="0"> = BOTTOM row (y=0), same as imshow(origin="lower")
-        data = np.array([[int(v) for v in row.text.split(",")] for row in rows])
+        # float so this works for both integer event counts and the
+        # fractional-length flux_tally
+        data = np.array([[float(v) for v in row.text.split(",")] for row in rows])
 
         x_world = nx * dx
         y_world = ny * dy
@@ -154,7 +156,7 @@ class ResultsPlotter:
             cmap=cmap, interpolation="nearest", zorder=0,
         )
         cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-        cbar.set_label("Event count")
+        cbar.set_label(cbar_label)
 
         if world_xml is not None:
             w = World.load(world_xml)
@@ -196,6 +198,15 @@ class ResultsPlotter:
         """Heatmap of where (non-fission) absorption happened (<absorp_tally>).
         Works for both continuous and group mode."""
         self._region_heatmap("absorp_tally", "absorption event heatmap", "viridis", world_xml=world_xml)
+
+    def plot_flux_heatmap(self, world_xml=None):
+        """Heatmap of the track-length flux (<flux_tally>): total path length
+        all neutrons travelled inside each cell (a cell crossed for 2 cm
+        scores 2.0, summed over every neutron/segment through it).
+        Works for both continuous and group mode.
+        world_xml: optional, overlays grid lines + circle borders."""
+        self._region_heatmap("flux_tally", "track-length flux heatmap", "plasma",
+                              world_xml=world_xml, cbar_label="Path length (cm)")
 
     def plot_k_generations(self, skip=None):
         """Plot k per generation (<k_generations>, group mode only).

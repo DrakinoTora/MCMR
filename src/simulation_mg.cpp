@@ -189,8 +189,10 @@ void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, i
         double d_surf = grid.distance_to_boundary(x, y, mu_x, mu_y, ix, iy, hit_side);
 
         double d = std::min(d_coll, d_surf);
+        double x_prev = x, y_prev = y;
         x += d * mu_x;
         y += d * mu_y;
+        results.add_flux_track(x_prev, y_prev, x, y);
 
         if (d_coll >= d_surf) {
             if (hit_side != Side::None) {

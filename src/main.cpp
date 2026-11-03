@@ -40,6 +40,7 @@ PYBIND11_MODULE(_mcmr_cpp, m) {
         .def_readonly("fission_tally", &Tally::fission_tally)
         .def_readonly("absorp_tally", &Tally::absorp_tally)
         .def_readonly("seed", &Tally::seed)
+        .def_readonly("flux_tally", &Tally::flux_tally)
         .def_readonly("tally_nx", &Tally::tally_nx)
         .def_readonly("tally_ny", &Tally::tally_ny)
         .def_readonly("tally_dx", &Tally::tally_dx)

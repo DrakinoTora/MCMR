@@ -38,7 +38,8 @@ struct Tally {
     // visualized (heatmap) independently -- fission_tally only counts
     // fission events, absorp_tally only counts (non-fission) absorption
     // events. Continuous mode (Simulation, no fission model) only ever
-    // populates absorp_tally; fission_tally stays all-zero for it.
+    // populates absorp_tally and flux_tally; fission_tally stays all-zero
+    // for it.
     // tally_nx/tally_ny = number of columns/rows; tally_dx/tally_dy = each
     // cell's width/height in world units (= x_world/tally_nx, y_world/tally_ny).
     //
@@ -50,12 +51,22 @@ struct Tally {
     // ------------------------------------------------------------------ //
     std::vector<int> fission_tally;
     std::vector<int> absorp_tally;
+    // Track-length flux estimator, same grid as fission_tally/absorp_tally
+    // (same tally_nx/tally_ny/tally_dx/tally_dy). Every straight-line segment
+    // a neutron travels (birth-to-collision, collision-to-collision,
+    // collision-to-boundary, reflection-to-collision, ...) adds its length
+    // to EVERY cell that segment passes through, weighted by exactly how much
+    // of the segment lies in that cell -- e.g. a neutron crossing a cell for
+    // 2 cm adds 2.0 to it, and a segment that clips the corner of two cells
+    // splits its length between them proportionally. Applies to every
+    // particle and every cell, whether or not a collision happens there.
+    std::vector<double> flux_tally;
     int tally_nx = 0;
     int tally_ny = 0;
     double tally_dx = 0.0;
     double tally_dy = 0.0;
 
-    // (Re)initialize both tally grids to nx x ny cells covering [0,x_world] x
+    // (Re)initialize all tally grids to nx x ny cells covering [0,x_world] x
     // [0,y_world], all zeroed. Called once per run() (after the rest of the
     // Tally is reset) so every fresh run starts from an all-zero grid.
     void init_region_tally(int nx, int ny, double x_world, double y_world);
@@ -66,4 +77,11 @@ struct Tally {
     // of being silently dropped.
     void add_fission_hit(double x, double y);
     void add_absorp_hit(double x, double y);
+
+    // Track-length flux score: add the length of the straight segment from
+    // (x0,y0) to (x1,y1) to every cell of flux_tally it crosses, split
+    // proportionally to how much of the segment lies in each cell. A
+    // zero-length segment is a no-op. Endpoints outside
+    // [0,x_world] x [0,y_world] are clamped onto the grid first.
+    void add_flux_track(double x0, double y0, double x1, double y1);
 };
