@@ -1,3 +1,4 @@
+import math
 import xml.etree.ElementTree as ET
 from ._mcmr_cpp import canonical_material_name
 
@@ -27,13 +28,23 @@ class GroupMaterial:
             sigma_s=[0.3, 0.1, 0.06],
             sigma_f=[0.001, 0.0005, 0.00001],   # optional, default 0 (no fission)
             nu=[2.7, 2.5, 2.3],                 # optional, default 0
+            chi_fission=[0.8, 0.2, 0.0],        # optional, see below
         )
+
+    chi_fission is the fission spectrum: the probability that a neutron born
+    from a fission in this material lands in each group. It has one entry per
+    group and does NOT depend on the group of the neutron that caused the
+    fission. It is normalized internally, so the entries only need to be
+    non-negative with a positive sum -- [4, 1, 0] means exactly the same as
+    [0.8, 0.2, 0.0]. Every child of a fission draws its own group from it.
+    Left out (None or []), fission children inherit the group of the neutron
+    that fissioned.
 
     Absorption is implicit: sigma_a[g] = sigma_t[g] - sigma_s[g] - sigma_f[g],
     for every group it must be >= 0 (sigma_s + sigma_f can't exceed sigma_t).
     """
 
-    def __init__(self, name, sigma_t, sigma_s, sigma_f=None, nu=None):
+    def __init__(self, name, sigma_t, sigma_s, sigma_f=None, nu=None, chi_fission=None):
         name = canonical_material_name(name)  # raises ValueError early if unknown
         sigma_t = list(sigma_t)
         sigma_s = list(sigma_s)
@@ -62,11 +73,28 @@ class GroupMaterial:
             if nu[g] < 0:
                 raise ValueError(f"{name}: nu can't be negative (group {g})")
 
+        # chi_fission: None / [] = not given (children keep the parent's group).
+        # The raw weights are kept as the caller typed them (so save/load round-trips
+        # exactly); normalization happens in the C++ engine.
+        if chi_fission is not None:
+            chi_fission = [float(c) for c in chi_fission]
+        if not chi_fission:
+            chi_fission = None
+        else:
+            if len(chi_fission) != n_groups:
+                raise ValueError(f"{name}: chi_fission must have {n_groups} elements (one per group), got {len(chi_fission)}")
+            for g, c in enumerate(chi_fission):
+                if not math.isfinite(c) or c < 0:
+                    raise ValueError(f"{name}: chi_fission must be finite and non-negative (group {g}: {c})")
+            if sum(chi_fission) <= 0:
+                raise ValueError(f"{name}: chi_fission must have a positive sum (can't normalize all zeros)")
+
         self.name = name
         self.sigma_t = sigma_t
         self.sigma_s = sigma_s
         self.sigma_f = sigma_f
         self.nu = nu
+        self.chi_fission = chi_fission
         self.n_groups = n_groups
 
 
@@ -89,8 +117,8 @@ class MaterialLibrary:
         self.materials = {}  # name -> GroupMaterial
         self.n_groups = None
 
-    def add_material(self, name, sigma_t, sigma_s, sigma_f=None, nu=None):
-        gm = GroupMaterial(name, sigma_t, sigma_s, sigma_f, nu)
+    def add_material(self, name, sigma_t, sigma_s, sigma_f=None, nu=None, chi_fission=None):
+        gm = GroupMaterial(name, sigma_t, sigma_s, sigma_f, nu, chi_fission)
         if self.n_groups is None:
             self.n_groups = gm.n_groups
         elif gm.n_groups != self.n_groups:
@@ -125,6 +153,8 @@ class MaterialLibrary:
             ET.SubElement(m_el, "sigma_s").text = ",".join(map(str, gm.sigma_s))
             ET.SubElement(m_el, "sigma_f").text = ",".join(map(str, gm.sigma_f))
             ET.SubElement(m_el, "nu").text = ",".join(map(str, gm.nu))
+            if gm.chi_fission is not None:  # only written when given, so "absent" survives a round trip
+                ET.SubElement(m_el, "chi_fission").text = ",".join(map(str, gm.chi_fission))
 
         tree = ET.ElementTree(root)
         ET.indent(tree, space="  ")
@@ -145,6 +175,8 @@ class MaterialLibrary:
             nu_el = m_el.find("nu")
             sigma_f = [float(v) for v in sf_el.text.split(",") if v] if sf_el is not None and sf_el.text else None
             nu = [float(v) for v in nu_el.text.split(",") if v] if nu_el is not None and nu_el.text else None
-            lib.add_material(name=name, sigma_t=sigma_t, sigma_s=sigma_s, sigma_f=sigma_f, nu=nu)
+            chi_el = m_el.find("chi_fission")  # optional: files saved before chi_fission existed have none
+            chi_fission = [float(v) for v in chi_el.text.split(",") if v] if chi_el is not None and chi_el.text else None
+            lib.add_material(name=name, sigma_t=sigma_t, sigma_s=sigma_s, sigma_f=sigma_f, nu=nu, chi_fission=chi_fission)
 
         return lib

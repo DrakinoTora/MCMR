@@ -7,7 +7,7 @@ MCMR is a high-performance C++17 Monte Carlo Neutron Transport simulation librar
 - **Rectangular + Circular Regions**: build a world out of a rectangular grid, then layer true circular regions on top with `World.add_circle()` / `World.add_circles()` (or the matching methods on `Geometry`) — circles use real line-circle intersection in the physics engine, not a rasterized approximation.
 - **Two Physics Modes**:
   - `mode="continuous"` (default) — Watt fission spectrum birth + continuous-energy cross sections, interpolated from the bundled nuclear data.
-  - `mode="group"` — multi-group (discretized energy) transport, including fission ($\Sigma_f$, $\nu$), driven by user-supplied `GroupMaterial` / `MaterialLibrary` cross-section sets.
+  - `mode="group"` — multi-group (discretized energy) transport, including fission ($\Sigma_f$, $\nu$, and an optional fission spectrum $\chi$ via `chi_fission`), driven by user-supplied `GroupMaterial` / `MaterialLibrary` cross-section sets.
 - **Flexible Boundary Conditions**: `vacuum` or `reflective`, set independently per side (top/bottom/left/right).
 - **Self-Contained Cross-Section Data**: built-in nuclear cross-section HTML data parser (BeautifulSoup4 + pandas), with fast linear interpolation for macroscopic cross-sections ($\Sigma_t$ and $\Sigma_s$).
 - **XML Import/Export**: save a `World` definition, a `MaterialLibrary` (group cross sections), and simulation results (particle tallies, trajectories) all to XML, and reload any of them later to re-run or re-plot.

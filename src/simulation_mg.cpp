@@ -93,7 +93,8 @@ void SimulationMG::set_group_data(
     const std::map<std::string, std::vector<double>>& sigma_t_,
     const std::map<std::string, std::vector<double>>& sigma_s_,
     const std::map<std::string, std::vector<double>>& sigma_f_,
-    const std::map<std::string, std::vector<double>>& nu_
+    const std::map<std::string, std::vector<double>>& nu_,
+    const std::map<std::string, std::vector<double>>& chi_fission_
 ) {
     if (n_groups_ <= 0)
         throw std::invalid_argument("n_groups must be positive");
@@ -101,6 +102,10 @@ void SimulationMG::set_group_data(
     // sigma_f and nu are optional per material: a material missing from those maps
     // gets zeros (no fission), so run() can always index them by material symbol
     std::map<std::string, std::vector<double>> sf_full, nu_full;
+    // chi_fission is optional too, but "absent" means something different from
+    // zeros (inherit the parent's group), so only materials that really give
+    // a chi get an entry here
+    std::map<std::string, std::vector<double>> chi_cdf_full;
 
     for (const auto& kv : sigma_t_) {
         const std::string& name = kv.first;
@@ -138,6 +143,34 @@ void SimulationMG::set_group_data(
 
         sf_full[name] = sf;
         nu_full[name] = nu_m;
+
+        auto chi_it = chi_fission_.find(name);
+        if (chi_it != chi_fission_.end() && !chi_it->second.empty()) {
+            const auto& chi = chi_it->second;
+            if (static_cast<int>(chi.size()) != n_groups_)
+                throw std::invalid_argument("chi_fission for material '" + name +
+                                             "' must have exactly n_groups elements");
+            double total = 0.0;
+            for (int g = 0; g < n_groups_; ++g) {
+                if (!std::isfinite(chi[g]) || chi[g] < 0.0)
+                    throw std::invalid_argument("chi_fission must be finite and non-negative, got " +
+                                                 std::to_string(chi[g]) + " at group " + std::to_string(g) +
+                                                 " for material '" + name + "'");
+                total += chi[g];
+            }
+            if (!(total > 0.0))
+                throw std::invalid_argument("chi_fission for material '" + name +
+                                             "' must have a positive sum (can't normalize all zeros)");
+
+            std::vector<double> cdf(n_groups_);
+            double running = 0.0;
+            for (int g = 0; g < n_groups_; ++g) {
+                running += chi[g];
+                cdf[g] = running / total;
+            }
+            cdf.back() = 1.0;  // kill any rounding gap, so a draw u < 1 always lands on a group
+            chi_cdf_full[name] = std::move(cdf);
+        }
     }
 
     n_groups = n_groups_;
@@ -145,6 +178,7 @@ void SimulationMG::set_group_data(
     sigma_s = sigma_s_;
     sigma_f = sf_full;
     nu = nu_full;
+    chi_cdf = chi_cdf_full;
 }
 
 void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, int g, int ix, int iy,
@@ -237,15 +271,28 @@ void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, i
             results.add_absorp_hit(x, y);
         } else {
             // fission: the parent dies here, its children go into the fission bank.
-            // position = parent's position, group = parent's group,
-            // direction = a fresh isotropic direction for EACH child
+            // position = parent's position,
+            // direction = a fresh isotropic direction for EACH child,
+            // group = drawn for EACH child from this material's chi_fission
+            //         (independent of the parent's group g); if the material
+            //         has no chi_fission, the child just inherits g
             alive = false;
             results.add_fission_hit(x, y);
+
+            const auto chi_it = chi_cdf.find(cur_mat.symbol);
+            const std::vector<double>* cdf = (chi_it != chi_cdf.end()) ? &chi_it->second : nullptr;
 
             int n_children = sample_fission_neutrons(nu.at(cur_mat.symbol)[g] / k_current, gen);
             for (int k = 0; k < n_children; ++k) {
                 double child_phi = dist_phi(gen);
-                fission_bank.push_back({x, y, std::cos(child_phi), std::sin(child_phi), g});
+                int child_g = g;
+                if (cdf) {
+                    // first group whose cumulative probability exceeds u. Groups with
+                    // chi == 0 repeat the previous cdf value, so they are never picked.
+                    double u = dist_R(gen);
+                    child_g = static_cast<int>(std::upper_bound(cdf->begin(), cdf->end(), u) - cdf->begin());
+                }
+                fission_bank.push_back({x, y, std::cos(child_phi), std::sin(child_phi), child_g});
             }
         }
     }

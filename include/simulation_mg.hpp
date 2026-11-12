@@ -19,8 +19,13 @@
 //   - fission: the parent dies (tallied into the region tally, at its
 //     position) and
 //     sample_fission_neutrons(nu[g]) children are pushed into fission_bank:
-//     same position and same group as the parent, each with its own
-//     isotropic direction.
+//     same position as the parent, each with its own isotropic direction.
+//     Each child's GROUP is sampled independently from the chi_fission of the
+//     material the fission happened in (the spectrum of neutrons born from
+//     fission; it does NOT depend on the group of the neutron that caused the
+//     fission). chi_fission is normalized, so its weights need not sum to 1.
+//     A material with no chi_fission keeps the older rule: child group = parent
+//     group.
 //
 // GENERATIONS (power iteration / fission-source cycling, standard technique
 // for k-eigenvalue problems): run(n_gen) processes n_gen generations, each
@@ -73,6 +78,12 @@ private:
     std::map<std::string, std::vector<double>> sigma_f;
     std::map<std::string, std::vector<double>> nu;
 
+    // per-material fission spectrum chi, stored as a CUMULATIVE normalized
+    // distribution (cdf[g] = P(child group <= g), cdf.back() == 1) so a child's
+    // group is one uniform draw + a binary search. A material with NO entry
+    // here has no chi_fission: its fission children inherit the parent's group.
+    std::map<std::string, std::vector<double>> chi_cdf;
+
     // fission products accumulated during the CURRENT generation, to be
     // resampled (with replacement) into next generation's population. No
     // longer a FIFO -- cleared and rebuilt fresh every generation.
@@ -115,7 +126,12 @@ public:
         const std::map<std::string, std::vector<double>>& sigma_t_,
         const std::map<std::string, std::vector<double>>& sigma_s_,
         const std::map<std::string, std::vector<double>>& sigma_f_,
-        const std::map<std::string, std::vector<double>>& nu_
+        const std::map<std::string, std::vector<double>>& nu_,
+        // optional: material -> chi_fission weights (n_groups long, >= 0, sum > 0;
+        // normalized here, so they need not sum to 1). A material missing from
+        // this map (or mapped to an empty vector) has no chi: children inherit
+        // the parent's group.
+        const std::map<std::string, std::vector<double>>& chi_fission_ = {}
     );
 
     // n_gen: number of generations to cycle through (see the class comment

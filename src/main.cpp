@@ -126,7 +126,8 @@ PYBIND11_MODULE(_mcmr_cpp, m) {
             py::arg("bc_right") = "vacuum")
         .def("set_group_data", &SimulationMG::set_group_data,
             py::arg("n_groups"), py::arg("sigma_t"), py::arg("sigma_s"),
-            py::arg("sigma_f"), py::arg("nu"))
+            py::arg("sigma_f"), py::arg("nu"),
+            py::arg("chi_fission") = std::map<std::string, std::vector<double>>{})
         .def("run", &SimulationMG::run, py::arg("n_gen") = 1, py::arg("k") = 1.0, py::arg("seed") = py::none())
         .def("export_xml", &SimulationMG::export_xml, py::arg("filename") = "mcmr_results_mg.xml")
         .def("get_tally", &SimulationMG::get_tally);
