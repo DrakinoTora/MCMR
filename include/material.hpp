@@ -3,6 +3,9 @@
 
 struct MaterialInfo {
     std::string symbol;
+    // Key into the continuous-energy cross-section data (data/<mat_code>-N.html).
+    // -1 means this element has no such data: it is still a valid material for
+    // multi-group mode, but can't be used in continuous-energy mode.
     int mat_code;
     double A;
     // Atomic number density N [atoms/cm^3], used to convert the microscopic

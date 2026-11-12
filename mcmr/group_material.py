@@ -7,9 +7,10 @@ __all__ = ["GroupMaterial", "MaterialLibrary"]
 class GroupMaterial:
     """Multi-group (discretized energy) cross-section data for ONE material.
 
-    `name` can be any spelling the engine recognizes -- "Fe", "fe", "besi",
-    "iron", etc. It is resolved to the canonical symbol ("Be", "C", "Fe" or
-    "Pb") right here, through the SAME lookup the C++ engine uses internally
+    `name` can be ANY chemical element, by symbol or English name, in any
+    letter case -- "U", "u", "uranium", "Fe", "besi", "iron", etc. It is
+    resolved to the element's canonical symbol (e.g. "U", "Fe") right here,
+    through the SAME lookup the C++ engine uses internally
     (see get_material_info() in src/material.cpp, exposed to Python as
     canonical_material_name()). This is the single source of truth for
     aliases: nothing else in this file, or in World._run_group(), keeps its

@@ -1,5 +1,5 @@
 # MCMR (Monte Carlo Multi-Region)
-MCMR is a high-performance C++17 Monte Carlo Neutron Transport simulation library, wrapped for Python via pybind11 and scikit-build-core. It simulates 2D neutron transport, scattering, absorption, fission, and transmission across multi-region geometries built from any combination of `Be`, `C`, `Fe`, and `Pb` regions, using analog techniques.
+MCMR is a high-performance C++17 Monte Carlo Neutron Transport simulation library, wrapped for Python via pybind11 and scikit-build-core. It simulates 2D neutron transport, scattering, absorption, fission, and transmission across multi-region geometries built from any chemical element (by symbol or English name, e.g. `U`, `Na`, `uranium`), using analog techniques. Multi-group mode (`mode="group"`) accepts any element, since you supply its cross sections; continuous-energy mode (the default) ships with data for `Be`, `C`, `Fe`, and `Pb` only.
 
 ## Features
 - **High Performance**: core Monte Carlo tracking engine written in C++17.

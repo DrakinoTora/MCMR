@@ -302,7 +302,7 @@ class World:
         if unknown:
             raise ValueError(
                 f"material_matrix/circles use unrecognized material name(s): {', '.join(sorted(unknown))} "
-                "(known: Be, C, Fe, Pb, and their aliases -- see get_material_info() in src/material.cpp)"
+                "(use any element symbol or English name, e.g. U, Na, Fe, hydrogen, uranium)"
             )
 
         used_names = set(canonical_of.values())

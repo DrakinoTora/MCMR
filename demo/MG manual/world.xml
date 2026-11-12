@@ -7,14 +7,14 @@
   </grid>
   <boundary top="vacuum" bottom="vacuum" left="vacuum" right="vacuum" />
   <materials>
-    <row index="0">C,C,C,C,C,C,C,C</row>
-    <row index="1">C,C,C,C,C,C,C,C</row>
-    <row index="2">C,C,C,C,C,C,C,C</row>
-    <row index="3">C,C,C,C,C,C,C,C</row>
-    <row index="4">C,C,C,C,C,C,C,C</row>
-    <row index="5">C,C,C,C,C,C,C,C</row>
-    <row index="6">C,C,C,C,C,C,C,C</row>
-    <row index="7">C,C,C,C,C,C,C,C</row>
+    <row index="0">U,U,U,U,U,U,U,U</row>
+    <row index="1">U,U,U,U,U,U,U,U</row>
+    <row index="2">U,U,U,U,U,U,U,U</row>
+    <row index="3">U,U,U,U,U,U,U,U</row>
+    <row index="4">U,U,U,U,U,U,U,U</row>
+    <row index="5">U,U,U,U,U,U,U,U</row>
+    <row index="6">U,U,U,U,U,U,U,U</row>
+    <row index="7">U,U,U,U,U,U,U,U</row>
   </materials>
   <sources>
     <row index="0">0,0,0,0,0,0,0,0</row>

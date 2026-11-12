@@ -102,6 +102,26 @@ void Simulation::set_cross_sections(
 }
 
 void Simulation::run(std::optional<std::uint64_t> seed) {
+    // Continuous-energy transport needs pointwise cross-section data for every
+    // material present in the world. get_material_info() accepts any element
+    // (for multi-group mode), but only Be/C/Fe/Pb have data files -- without
+    // this check a material like U would only fail deep inside the transport
+    // loop as an unhelpful "map::at" error, after the run had already started.
+    auto require_data = [&](const MaterialInfo& m) {
+        const int c = m.mat_code;
+        if (!E_data_total.count(c) || !Sig_data_total.count(c) ||
+            !E_data_scatter.count(c) || !Sig_data_scatter.count(c))
+            throw std::invalid_argument(
+                "Material '" + m.symbol + "' has no continuous-energy cross-section data "
+                "(mode='continuous' only works for materials with data files in data/). "
+                "Use mode='group' with a MaterialLibrary for this material.");
+    };
+    for (int ix = 0; ix < grid.nx(); ++ix)
+        for (int iy = 0; iy < grid.ny(); ++iy)
+            require_data(grid.region_at(ix, iy).material);
+    for (int i = 0; i < grid.num_circles(); ++i)
+        require_data(grid.circle_at_index(i).material);
+
     // Reset any state left over from a PREVIOUS run() call on this same object
     // (results, saved-history buffers) so calling run() twice doesn't silently
     // accumulate two runs' worth of particles into one Tally.
