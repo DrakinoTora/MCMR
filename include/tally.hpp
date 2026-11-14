@@ -58,25 +58,33 @@ struct Tally {
     // ------------------------------------------------------------------ //
     std::vector<int> fission_tally;
     std::vector<int> absorp_tally;
-    // Track-length flux estimator, same grid as fission_tally/absorp_tally
-    // (same tally_nx/tally_ny/tally_dx/tally_dy). Every straight-line segment
-    // a neutron travels (birth-to-collision, collision-to-collision,
-    // collision-to-boundary, reflection-to-collision, ...) adds its length
-    // to EVERY cell that segment passes through, weighted by exactly how much
-    // of the segment lies in that cell -- e.g. a neutron crossing a cell for
-    // 2 cm adds 2.0 to it, and a segment that clips the corner of two cells
-    // splits its length between them proportionally. Applies to every
-    // particle and every cell, whether or not a collision happens there.
+    // Track-length flux estimator, PER ENERGY GROUP, on the same cell grid as
+    // fission_tally/absorp_tally (same tally_nx/tally_ny/tally_dx/tally_dy).
+    // Every straight-line segment a neutron travels (birth-to-collision,
+    // collision-to-collision, collision-to-boundary, reflection-to-collision,
+    // ...) adds its length to EVERY cell that segment passes through, weighted
+    // by exactly how much of the segment lies in that cell, and it is scored
+    // into the grid of the group the neutron is IN while travelling that
+    // segment (a neutron only changes group at a scatter, i.e. between
+    // segments). E.g. a group-2 neutron crossing a cell for 2 cm adds 2.0 to
+    // that cell in group 2's grid.
+    //
+    // Flat layout: index = g * (tally_nx*tally_ny) + iy_t * tally_nx + ix_t
+    // (g = 0 is the fastest group, same numbering as G_born/G_leak), size =
+    // flux_groups * tally_nx * tally_ny. Group mode: flux_groups = n_groups.
+    // Continuous mode has no groups: flux_groups = 1, a single grid holding
+    // the total flux. Summing over g gives the total (all-group) flux.
     std::vector<double> flux_tally;
+    int flux_groups = 1;  // number of group grids stored in flux_tally
     int tally_nx = 0;
     int tally_ny = 0;
     double tally_dx = 0.0;
     double tally_dy = 0.0;
 
     // (Re)initialize all tally grids to nx x ny cells covering [0,x_world] x
-    // [0,y_world], all zeroed. Called once per run() (after the rest of the
+    // [0,y_world], all zeroed. flux_tally gets n_groups grids (default 1). Called once per run() (after the rest of the
     // Tally is reset) so every fresh run starts from an all-zero grid.
-    void init_region_tally(int nx, int ny, double x_world, double y_world);
+    void init_region_tally(int nx, int ny, double x_world, double y_world, int n_groups = 1);
 
     // Increment the fission_tally / absorp_tally cell containing (x, y) by 1.
     // A point that falls (very slightly, from floating point) outside
@@ -86,9 +94,10 @@ struct Tally {
     void add_absorp_hit(double x, double y);
 
     // Track-length flux score: add the length of the straight segment from
-    // (x0,y0) to (x1,y1) to every cell of flux_tally it crosses, split
+    // (x0,y0) to (x1,y1) to every cell of flux_tally's grid for `group` it crosses, split
     // proportionally to how much of the segment lies in each cell. A
     // zero-length segment is a no-op. Endpoints outside
     // [0,x_world] x [0,y_world] are clamped onto the grid first.
-    void add_flux_track(double x0, double y0, double x1, double y1);
+    // A group outside [0, flux_groups) is ignored.
+    void add_flux_track(double x0, double y0, double x1, double y1, int group = 0);
 };

@@ -128,24 +128,36 @@ class ResultsPlotter:
         plt.tight_layout()
         plt.show()
     
-    def _region_heatmap(self, tag, title, cmap, world_xml=None, cbar_label="Event count"):
-        el = self.root.find(f".//{tag}")
-        if el is None:
+    def _region_heatmap(self, tag, title, cmap, world_xml=None, cbar_label="Event count", group=None):
+        els = self.root.findall(f".//{tag}")
+        if not els:
             raise ValueError(
                 f"this results XML has no <{tag}> block -- it was produced by an "
-                "older engine build that didn't separate fission/absorption tallies; "
+                "older engine build that didn't have this tally; "
                 "rerun the simulation with the current mcmr build."
             )
+        if group is not None:
+            available = [e.get("group") for e in els]
+            els = [e for e in els if e.get("group") == str(group)]
+            if not els:
+                raise ValueError(f"<{tag}> has no group {group!r}; available groups: {available}")
+            title = f"{title} (group {group})"
+        elif len(els) > 1:
+            title = f"{title} (all {len(els)} groups summed)"
 
+        # all selected blocks share one grid; summing them gives the total over groups
+        el = els[0]
         nx = int(el.get("nx"))
         ny = int(el.get("ny"))
         dx = float(el.get("dx"))
         dy = float(el.get("dy"))
-        rows = el.findall("row")
         # <row index="0"> = BOTTOM row (y=0), same as imshow(origin="lower")
         # float so this works for both integer event counts and the
         # fractional-length flux_tally
-        data = np.array([[float(v) for v in row.text.split(",")] for row in rows])
+        data = sum(
+            np.array([[float(v) for v in row.text.split(",")] for row in e.findall("row")])
+            for e in els
+        )
 
         x_world = nx * dx
         y_world = ny * dy
@@ -199,14 +211,15 @@ class ResultsPlotter:
         Works for both continuous and group mode."""
         self._region_heatmap("absorp_tally", "absorption event heatmap", "viridis", world_xml=world_xml)
 
-    def plot_flux_heatmap(self, world_xml=None):
+    def plot_flux_heatmap(self, world_xml=None, group=None):
         """Heatmap of the track-length flux (<flux_tally>): total path length
-        all neutrons travelled inside each cell (a cell crossed for 2 cm
-        scores 2.0, summed over every neutron/segment through it).
-        Works for both continuous and group mode.
+        neutrons travelled inside each cell (a cell crossed for 2 cm scores
+        2.0, summed over every neutron/segment through it).
+        group: None (default) = all groups summed (total flux); an int = only
+        that energy group (0 = fastest). Continuous mode has a single group 0.
         world_xml: optional, overlays grid lines + circle borders."""
         self._region_heatmap("flux_tally", "track-length flux heatmap", "plasma",
-                              world_xml=world_xml, cbar_label="Path length (cm)")
+                              world_xml=world_xml, cbar_label="Path length (cm)", group=group)
 
     def plot_k_generations(self, skip=None):
         """Plot k per generation (<k_generations>, group mode only).

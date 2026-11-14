@@ -46,20 +46,26 @@ void export_to_xml(const Tally& tally, const std::string& filename) {
     }
     f << "  </absorp_tally>\n";
 
-    // Track-length flux: total path length (world units) travelled inside each
-    // cell by all neutrons. Same grid/shape as the tallies above but doubles.
+    // Track-length flux, one <flux_tally> block PER GROUP (group="0" = fastest,
+    // same numbering as G_born/G_leak): total path length (world units)
+    // travelled inside each cell by neutrons in that group. Same grid/shape as
+    // the tallies above but doubles. Continuous mode has no groups -> a single
+    // block, group="0", holding the total flux.
     f << std::setprecision(10);
-    f << "  <flux_tally nx=\"" << tally.tally_nx << "\" ny=\"" << tally.tally_ny
-      << "\" dx=\"" << tally.tally_dx << "\" dy=\"" << tally.tally_dy << "\">\n";
-    for (int iy_t = 0; iy_t < tally.tally_ny; ++iy_t) {
-        f << "    <row index=\"" << iy_t << "\">";
-        for (int ix_t = 0; ix_t < tally.tally_nx; ++ix_t) {
-            f << tally.flux_tally[static_cast<size_t>(iy_t) * tally.tally_nx + ix_t];
-            if (ix_t + 1 != tally.tally_nx) f << ",";
+    const size_t cells_per_group = static_cast<size_t>(tally.tally_nx) * static_cast<size_t>(tally.tally_ny);
+    for (int g = 0; g < tally.flux_groups; ++g) {
+        f << "  <flux_tally group=\"" << g << "\" nx=\"" << tally.tally_nx << "\" ny=\"" << tally.tally_ny
+          << "\" dx=\"" << tally.tally_dx << "\" dy=\"" << tally.tally_dy << "\">\n";
+        for (int iy_t = 0; iy_t < tally.tally_ny; ++iy_t) {
+            f << "    <row index=\"" << iy_t << "\">";
+            for (int ix_t = 0; ix_t < tally.tally_nx; ++ix_t) {
+                f << tally.flux_tally[g * cells_per_group + static_cast<size_t>(iy_t) * tally.tally_nx + ix_t];
+                if (ix_t + 1 != tally.tally_nx) f << ",";
+            }
+            f << "</row>\n";
         }
-        f << "</row>\n";
+        f << "  </flux_tally>\n";
     }
-    f << "  </flux_tally>\n";
     
     f << "  <energy_born>\n    ";
     for (size_t i = 0; i < tally.E_born.size(); ++i) {

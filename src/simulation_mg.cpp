@@ -275,7 +275,7 @@ void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, i
         double x_prev = x, y_prev = y;
         x += d * mu_x;
         y += d * mu_y;
-        results.add_flux_track(x_prev, y_prev, x, y);
+        results.add_flux_track(x_prev, y_prev, x, y, g);
 
         if (d_coll >= d_surf) {
             if (hit_side != Side::None) {
@@ -376,7 +376,7 @@ void SimulationMG::run(int n_gen, double k, std::optional<std::uint64_t> seed) {
     // that half, results = Tally{} covers the rest).
     results = Tally{};
     results.seed = resolve_seed(seed);
-    results.init_region_tally(tally_res_x, tally_res_y, grid.world_max_x(), grid.world_max_y());
+    results.init_region_tally(tally_res_x, tally_res_y, grid.world_max_x(), grid.world_max_y(), n_groups);
     fission_bank.clear();
     k_current = k;
 
