@@ -29,6 +29,9 @@ class GroupMaterial:
             sigma_f=[0.001, 0.0005, 0.00001],   # optional, default 0 (no fission)
             nu=[2.7, 2.5, 2.3],                 # optional, default 0
             chi_fission=[0.8, 0.2, 0.0],        # optional, see below
+            chi_scatter=[[0.6, 0.3, 0.1],       # optional, see below
+                         [0.0, 0.7, 0.3],
+                         [0.0, 0.0, 1.0]],
         )
 
     chi_fission is the fission spectrum: the probability that a neutron born
@@ -40,11 +43,26 @@ class GroupMaterial:
     Left out (None or []), fission children inherit the group of the neutron
     that fissioned.
 
+    chi_scatter is the scattering matrix: an n_groups x n_groups list of lists
+    (or 2-D array) whose entry [i][j] is the probability that a neutron which
+    scatters while in group i continues in group j. So the ROW is the group
+    before the scatter and the COLUMN the group after it: the top row is what
+    happens after a scatter out of group 0, the next row out of group 1, and so
+    on. Every row is normalized on its own, so rows only need non-negative
+    entries and a positive sum (different rows may have different totals).
+    Nothing forces a direction: which entries are down- or up-scatter is
+    decided entirely by the matrix. The row sums do NOT set how often a
+    scatter happens -- that is still sigma_s[g]; the row only says where the
+    neutron goes. A row of all zeros is accepted only for a group with
+    sigma_s[g] == 0 (that group never scatters, so the row is never used).
+    Left out (None or []), a scatter out of group g lands uniformly in groups
+    0..g.
+
     Absorption is implicit: sigma_a[g] = sigma_t[g] - sigma_s[g] - sigma_f[g],
     for every group it must be >= 0 (sigma_s + sigma_f can't exceed sigma_t).
     """
 
-    def __init__(self, name, sigma_t, sigma_s, sigma_f=None, nu=None, chi_fission=None):
+    def __init__(self, name, sigma_t, sigma_s, sigma_f=None, nu=None, chi_fission=None, chi_scatter=None):
         name = canonical_material_name(name)  # raises ValueError early if unknown
         sigma_t = list(sigma_t)
         sigma_s = list(sigma_s)
@@ -89,12 +107,42 @@ class GroupMaterial:
             if sum(chi_fission) <= 0:
                 raise ValueError(f"{name}: chi_fission must have a positive sum (can't normalize all zeros)")
 
+        # chi_scatter: None / [] = not given (uniform over groups 0..g). Raw rows are kept as
+        # typed (so save/load round-trips exactly); normalization happens in the C++ engine.
+        if chi_scatter is not None:
+            try:
+                chi_scatter = [[float(v) for v in row] for row in chi_scatter]
+            except TypeError:
+                raise ValueError(
+                    f"{name}: chi_scatter must be an n_groups x n_groups matrix (a list of lists), "
+                    f"e.g. [[0.5, 0.5], [0.0, 1.0]] for 2 groups"
+                ) from None
+        if not chi_scatter:
+            chi_scatter = None
+        else:
+            if len(chi_scatter) != n_groups:
+                raise ValueError(
+                    f"{name}: chi_scatter must have {n_groups} rows (one per group before the scatter), got {len(chi_scatter)}"
+                )
+            for i, row in enumerate(chi_scatter):
+                if len(row) != n_groups:
+                    raise ValueError(f"{name}: chi_scatter row {i} must have {n_groups} elements, got {len(row)}")
+                for j, v in enumerate(row):
+                    if not math.isfinite(v) or v < 0:
+                        raise ValueError(f"{name}: chi_scatter must be finite and non-negative (row {i}, column {j}: {v})")
+                if sum(row) <= 0 and sigma_s[i] > 0:
+                    raise ValueError(
+                        f"{name}: chi_scatter row {i} sums to zero, but sigma_s[{i}] = {sigma_s[i]} > 0 "
+                        f"(a neutron scattering out of group {i} would have nowhere to go)"
+                    )
+
         self.name = name
         self.sigma_t = sigma_t
         self.sigma_s = sigma_s
         self.sigma_f = sigma_f
         self.nu = nu
         self.chi_fission = chi_fission
+        self.chi_scatter = chi_scatter
         self.n_groups = n_groups
 
 
@@ -117,8 +165,8 @@ class MaterialLibrary:
         self.materials = {}  # name -> GroupMaterial
         self.n_groups = None
 
-    def add_material(self, name, sigma_t, sigma_s, sigma_f=None, nu=None, chi_fission=None):
-        gm = GroupMaterial(name, sigma_t, sigma_s, sigma_f, nu, chi_fission)
+    def add_material(self, name, sigma_t, sigma_s, sigma_f=None, nu=None, chi_fission=None, chi_scatter=None):
+        gm = GroupMaterial(name, sigma_t, sigma_s, sigma_f, nu, chi_fission, chi_scatter)
         if self.n_groups is None:
             self.n_groups = gm.n_groups
         elif gm.n_groups != self.n_groups:
@@ -155,6 +203,10 @@ class MaterialLibrary:
             ET.SubElement(m_el, "nu").text = ",".join(map(str, gm.nu))
             if gm.chi_fission is not None:  # only written when given, so "absent" survives a round trip
                 ET.SubElement(m_el, "chi_fission").text = ",".join(map(str, gm.chi_fission))
+            if gm.chi_scatter is not None:  # one <row> per group before the scatter (row 0 first)
+                cs_el = ET.SubElement(m_el, "chi_scatter")
+                for row in gm.chi_scatter:
+                    ET.SubElement(cs_el, "row").text = ",".join(map(str, row))
 
         tree = ET.ElementTree(root)
         ET.indent(tree, space="  ")
@@ -177,6 +229,12 @@ class MaterialLibrary:
             nu = [float(v) for v in nu_el.text.split(",") if v] if nu_el is not None and nu_el.text else None
             chi_el = m_el.find("chi_fission")  # optional: files saved before chi_fission existed have none
             chi_fission = [float(v) for v in chi_el.text.split(",") if v] if chi_el is not None and chi_el.text else None
-            lib.add_material(name=name, sigma_t=sigma_t, sigma_s=sigma_s, sigma_f=sigma_f, nu=nu, chi_fission=chi_fission)
+            cs_el = m_el.find("chi_scatter")  # optional: files saved before chi_scatter existed have none
+            chi_scatter = None
+            if cs_el is not None:
+                rows = [[float(v) for v in r.text.split(",") if v] for r in cs_el.findall("row") if r.text]
+                chi_scatter = rows or None
+            lib.add_material(name=name, sigma_t=sigma_t, sigma_s=sigma_s, sigma_f=sigma_f, nu=nu,
+                             chi_fission=chi_fission, chi_scatter=chi_scatter)
 
         return lib

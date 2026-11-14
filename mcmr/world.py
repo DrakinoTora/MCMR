@@ -310,7 +310,7 @@ class World:
         if missing:
             raise ValueError(f"group_materials is missing data for: {', '.join(sorted(missing))}")
 
-        sigma_t, sigma_s, sigma_f, nu, chi_fission = {}, {}, {}, {}, {}
+        sigma_t, sigma_s, sigma_f, nu, chi_fission, chi_scatter = {}, {}, {}, {}, {}, {}
         for name in used_names:
             gm = group_materials[name]
             sigma_t[name] = gm.sigma_t
@@ -319,6 +319,8 @@ class World:
             nu[name] = gm.nu
             if gm.chi_fission is not None:  # absent = children inherit the parent's group
                 chi_fission[name] = gm.chi_fission
+            if gm.chi_scatter is not None:  # absent = scatter lands uniformly in groups 0..g
+                chi_scatter[name] = gm.chi_scatter
 
         # material_matrix/circle_material go to C++ as-is (any alias); the C++
         # constructor resolves them to the same canonical symbols via
@@ -336,7 +338,7 @@ class World:
             tally_res_x=res_x, tally_res_y=res_y,
             bc_top=self.bc_top, bc_bot=self.bc_bot, bc_left=self.bc_left, bc_right=self.bc_right,
         )
-        sim.set_group_data(group_materials.n_groups, sigma_t, sigma_s, sigma_f, nu, chi_fission)
+        sim.set_group_data(group_materials.n_groups, sigma_t, sigma_s, sigma_f, nu, chi_fission, chi_scatter)
         sim.run(n_gen, k, seed)
         return sim
 

@@ -16,6 +16,11 @@
 //   - sigma_t / sigma_s / sigma_f: direct per-group lookup, no interpolation
 //   - scatter: isotropic direction, new group sampled uniform over [0, g]
 //     (down-scatter only -- group 0 = fastest, higher index = lower energy)
+//     -- unless the material has a chi_scatter matrix: then the new group is
+//     drawn from ROW g of it (row = group BEFORE the scatter, column = group
+//     AFTER, so the top row is the distribution after scattering out of group
+//     0). Every row is normalized on its own, and any direction is allowed
+//     (the matrix decides what is down- or up-scatter).
 //   - fission: the parent dies (tallied into the region tally, at its
 //     position) and
 //     sample_fission_neutrons(nu[g]) children are pushed into fission_bank:
@@ -84,6 +89,12 @@ private:
     // here has no chi_fission: its fission children inherit the parent's group.
     std::map<std::string, std::vector<double>> chi_cdf;
 
+    // per-material scatter matrix chi_scatter, stored as one CUMULATIVE normalized
+    // distribution per ROW: chi_scatter_cdf[mat][g][j] = P(group after scatter <= j |
+    // group before scatter = g), last element of every row == 1. A material with NO
+    // entry here has no chi_scatter and scatters with the older rule (uniform over [0, g]).
+    std::map<std::string, std::vector<std::vector<double>>> chi_scatter_cdf;
+
     // fission products accumulated during the CURRENT generation, to be
     // resampled (with replacement) into next generation's population. No
     // longer a FIFO -- cleared and rebuilt fresh every generation.
@@ -131,7 +142,14 @@ public:
         // normalized here, so they need not sum to 1). A material missing from
         // this map (or mapped to an empty vector) has no chi: children inherit
         // the parent's group.
-        const std::map<std::string, std::vector<double>>& chi_fission_ = {}
+        const std::map<std::string, std::vector<double>>& chi_fission_ = {},
+        // optional: material -> n_groups x n_groups matrix, row = group before the
+        // scatter, column = group after. Each row is normalized separately (rows need
+        // not sum to 1, and different rows may have different totals). A material
+        // missing from this map (or mapped to an empty matrix) has no chi_scatter.
+        // A row of all zeros is only accepted for a group with sigma_s == 0 (that
+        // group never scatters, so the row is never used).
+        const std::map<std::string, std::vector<std::vector<double>>>& chi_scatter_ = {}
     );
 
     // n_gen: number of generations to cycle through (see the class comment

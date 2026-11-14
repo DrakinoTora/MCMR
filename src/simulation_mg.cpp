@@ -94,7 +94,8 @@ void SimulationMG::set_group_data(
     const std::map<std::string, std::vector<double>>& sigma_s_,
     const std::map<std::string, std::vector<double>>& sigma_f_,
     const std::map<std::string, std::vector<double>>& nu_,
-    const std::map<std::string, std::vector<double>>& chi_fission_
+    const std::map<std::string, std::vector<double>>& chi_fission_,
+    const std::map<std::string, std::vector<std::vector<double>>>& chi_scatter_
 ) {
     if (n_groups_ <= 0)
         throw std::invalid_argument("n_groups must be positive");
@@ -106,6 +107,9 @@ void SimulationMG::set_group_data(
     // zeros (inherit the parent's group), so only materials that really give
     // a chi get an entry here
     std::map<std::string, std::vector<double>> chi_cdf_full;
+    // same for chi_scatter: only materials that really give a matrix get an entry
+    // ("absent" = the older uniform [0, g] rule), stored as one cdf per row
+    std::map<std::string, std::vector<std::vector<double>>> chi_scatter_cdf_full;
 
     for (const auto& kv : sigma_t_) {
         const std::string& name = kv.first;
@@ -171,6 +175,50 @@ void SimulationMG::set_group_data(
             cdf.back() = 1.0;  // kill any rounding gap, so a draw u < 1 always lands on a group
             chi_cdf_full[name] = std::move(cdf);
         }
+
+        auto cs_it = chi_scatter_.find(name);
+        if (cs_it != chi_scatter_.end() && !cs_it->second.empty()) {
+            const auto& mat = cs_it->second;
+            if (static_cast<int>(mat.size()) != n_groups_)
+                throw std::invalid_argument("chi_scatter for material '" + name +
+                                             "' must have exactly n_groups rows (one per group before the scatter)");
+
+            std::vector<std::vector<double>> cdf_rows(n_groups_);
+            for (int g = 0; g < n_groups_; ++g) {
+                const auto& row = mat[g];
+                if (static_cast<int>(row.size()) != n_groups_)
+                    throw std::invalid_argument("chi_scatter row " + std::to_string(g) + " for material '" + name +
+                                                 "' must have exactly n_groups elements");
+                double total = 0.0;
+                for (int j = 0; j < n_groups_; ++j) {
+                    if (!std::isfinite(row[j]) || row[j] < 0.0)
+                        throw std::invalid_argument("chi_scatter must be finite and non-negative, got " +
+                                                     std::to_string(row[j]) + " at row " + std::to_string(g) +
+                                                     ", column " + std::to_string(j) + " for material '" + name + "'");
+                    total += row[j];
+                }
+
+                std::vector<double> cdf(n_groups_);
+                if (total > 0.0) {
+                    double running = 0.0;
+                    for (int j = 0; j < n_groups_; ++j) {
+                        running += row[j];
+                        cdf[j] = running / total;
+                    }
+                    cdf.back() = 1.0;  // kill any rounding gap, so a draw u < 1 always lands on a group
+                } else {
+                    // nothing to normalize. Only fine if neutrons never scatter out of group g
+                    if (ss[g] > 0.0)
+                        throw std::invalid_argument("chi_scatter row " + std::to_string(g) + " for material '" + name +
+                                                     "' sums to zero, but sigma_s[" + std::to_string(g) +
+                                                     "] > 0 (a scattered neutron would have nowhere to go)");
+                    // never sampled; park a harmless "stay in group g" row
+                    for (int j = 0; j < n_groups_; ++j) cdf[j] = (j >= g) ? 1.0 : 0.0;
+                }
+                cdf_rows[g] = std::move(cdf);
+            }
+            chi_scatter_cdf_full[name] = std::move(cdf_rows);
+        }
     }
 
     n_groups = n_groups_;
@@ -179,6 +227,7 @@ void SimulationMG::set_group_data(
     sigma_f = sf_full;
     nu = nu_full;
     chi_cdf = chi_cdf_full;
+    chi_scatter_cdf = chi_scatter_cdf_full;
 }
 
 void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, int g, int ix, int iy,
@@ -260,12 +309,24 @@ void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, i
         // pick event by slicing [0, Sigma_t) into scatter / capture / fission
         double P = dist_R(gen) * Sigma_t;
         if (P < Sigma_s) {
-            // isotropic scatter, down-scatter only: new group uniform in [0, g]
+            // isotropic scatter. New group: row g of this material's chi_scatter if it has
+            // one (a draw from that row's cdf -- any group is allowed), otherwise the
+            // older rule, uniform in [0, g]
             double phi = dist_phi(gen);
             mu_x = std::cos(phi);
             mu_y = std::sin(phi);
-            std::uniform_int_distribution<int> dist_newg(0, g);
-            g = dist_newg(gen);
+
+            const auto cs_it = chi_scatter_cdf.find(cur_mat.symbol);
+            if (cs_it != chi_scatter_cdf.end()) {
+                const std::vector<double>& row_cdf = cs_it->second[g];
+                // first group whose cumulative probability exceeds u. Columns with
+                // probability 0 repeat the previous cdf value, so they are never picked.
+                double u = dist_R(gen);
+                g = static_cast<int>(std::upper_bound(row_cdf.begin(), row_cdf.end(), u) - row_cdf.begin());
+            } else {
+                std::uniform_int_distribution<int> dist_newg(0, g);
+                g = dist_newg(gen);
+            }
         } else if (P < Sigma_s + Sigma_a) {
             alive = false;
             results.add_absorp_hit(x, y);
