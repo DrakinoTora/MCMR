@@ -75,7 +75,28 @@ struct Tally {
     // Continuous mode has no groups: flux_groups = 1, a single grid holding
     // the total flux. Summing over g gives the total (all-group) flux.
     std::vector<double> flux_tally;
-    int flux_groups = 1;  // number of group grids stored in flux_tally
+    int flux_groups = 1;  // number of group grids stored in flux_tally (and the two rate tallies below)
+
+    // Reaction-RATE tallies (track-length estimator of  \int Sigma_x * phi dV):
+    // same layout, groups and cell grid as flux_tally, but each piece of a
+    // segment scores  (length inside the cell) * Sigma_x  instead of just the
+    // length, where Sigma_x is the macroscopic cross section [1/cm] of the
+    // material the segment is travelling through, for the neutron's current
+    // energy/group:
+    //   fission_rate_tally : Sigma_f (group mode; stays all-zero in continuous
+    //                        mode, which has no fission model)
+    //   absorp_rate_tally  : Sigma_a = pure capture, i.e. what the engine itself
+    //                        treats as non-fission absorption -- group mode:
+    //                        Sigma_t - Sigma_s - Sigma_f; continuous mode:
+    //                        Sigma_t(E) - Sigma_s(E)  (clamped at >= 0)
+    // A segment never spans two materials (the engine stops a neutron at every
+    // material cell / circle boundary), so Sigma is constant along a segment; when
+    // a neutron crosses into another material, the NEXT segment simply uses
+    // that material's Sigma. Unlike fission_tally/absorp_tally (integer counts
+    // of events), these score wherever a neutron merely passes through, so they
+    // are far less noisy for the same N.
+    std::vector<double> fission_rate_tally;
+    std::vector<double> absorp_rate_tally;
     int tally_nx = 0;
     int tally_ny = 0;
     double tally_dx = 0.0;
@@ -93,11 +114,18 @@ struct Tally {
     void add_fission_hit(double x, double y);
     void add_absorp_hit(double x, double y);
 
+    // Track-length score of the straight segment (x0,y0)->(x1,y1) in `group`.
+    // Per cell crossed (with L = length of the segment inside that cell):
+    //   flux_tally          += L
+    //   fission_rate_tally  += L * sigma_f
+    //   absorp_rate_tally   += L * sigma_a
+    // (one grid traversal scores all three). Original description:
     // Track-length flux score: add the length of the straight segment from
     // (x0,y0) to (x1,y1) to every cell of flux_tally's grid for `group` it crosses, split
     // proportionally to how much of the segment lies in each cell. A
     // zero-length segment is a no-op. Endpoints outside
     // [0,x_world] x [0,y_world] are clamped onto the grid first.
     // A group outside [0, flux_groups) is ignored.
-    void add_flux_track(double x0, double y0, double x1, double y1, int group = 0);
+    void add_flux_track(double x0, double y0, double x1, double y1, int group = 0,
+                        double sigma_f = 0.0, double sigma_a = 0.0);
 };

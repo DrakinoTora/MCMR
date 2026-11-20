@@ -230,7 +230,9 @@ void Simulation::run(std::optional<std::uint64_t> seed) {
             double x_prev = x, y_prev = y;
             x += d * mu_x;
             y += d * mu_y;
-            results.add_flux_track(x_prev, y_prev, x, y);
+            // continuous mode: no fission model (sigma_f = 0); absorption is whatever
+            // is not scattering, same rule the collision below uses
+            results.add_flux_track(x_prev, y_prev, x, y, 0, 0.0, std::max(0.0, Sigma_t - Sigma_s));
 
             if (d_coll >= d_surf) {
                 if (hit_side != Side::None) {

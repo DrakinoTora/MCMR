@@ -221,6 +221,27 @@ class ResultsPlotter:
         self._region_heatmap("flux_tally", "track-length flux heatmap", "plasma",
                               world_xml=world_xml, cbar_label="Path length (cm)", group=group)
 
+    def plot_fission_rate_heatmap(self, world_xml=None, group=None):
+        """Heatmap of the fission reaction rate (<fission_rate_tally>): track
+        length x Sigma_f of the material crossed, summed over every neutron
+        passing through each cell. Scores wherever neutrons pass (not only
+        where a fission happens), so it is smoother than plot_fission_heatmap.
+        Group mode only (all-zero for continuous mode).
+        group: None (default) = all groups summed; an int = only that group
+        (0 = fastest). world_xml: optional, overlays grid lines + circle borders."""
+        self._region_heatmap("fission_rate_tally", "fission rate heatmap (path length x Sigma_f)", "hot",
+                              world_xml=world_xml, cbar_label="Path length x Sigma_f", group=group)
+
+    def plot_absorption_rate_heatmap(self, world_xml=None, group=None):
+        """Heatmap of the (non-fission) absorption reaction rate
+        (<absorp_rate_tally>): track length x Sigma_a of the material crossed,
+        summed over every neutron passing through each cell. Works for both
+        modes; smoother than plot_absorption_heatmap.
+        group: None (default) = all groups summed; an int = only that group
+        (0 = fastest). world_xml: optional, overlays grid lines + circle borders."""
+        self._region_heatmap("absorp_rate_tally", "absorption rate heatmap (path length x Sigma_a)", "viridis",
+                              world_xml=world_xml, cbar_label="Path length x Sigma_a", group=group)
+
     def plot_k_generations(self, skip=None):
         """Plot k per generation (<k_generations>, group mode only).
 

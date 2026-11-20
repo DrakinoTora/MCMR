@@ -275,7 +275,9 @@ void SimulationMG::transport_one(double x, double y, double mu_x, double mu_y, i
         double x_prev = x, y_prev = y;
         x += d * mu_x;
         y += d * mu_y;
-        results.add_flux_track(x_prev, y_prev, x, y, g);
+        // Sigma_f / Sigma_a of THIS segment's material and group (a segment never
+        // spans two materials); Sigma_a clamped so inconsistent data can't score negative
+        results.add_flux_track(x_prev, y_prev, x, y, g, Sigma_f, std::max(0.0, Sigma_a));
 
         if (d_coll >= d_surf) {
             if (hit_side != Side::None) {

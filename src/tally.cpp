@@ -11,7 +11,10 @@ void Tally::init_region_tally(int nx, int ny, double x_world, double y_world, in
     fission_tally.assign(static_cast<size_t>(nx) * static_cast<size_t>(ny), 0);
     absorp_tally.assign(static_cast<size_t>(nx) * static_cast<size_t>(ny), 0);
     flux_groups = (n_groups > 0) ? n_groups : 1;
-    flux_tally.assign(static_cast<size_t>(flux_groups) * static_cast<size_t>(nx) * static_cast<size_t>(ny), 0.0);
+    const size_t n_flux = static_cast<size_t>(flux_groups) * static_cast<size_t>(nx) * static_cast<size_t>(ny);
+    flux_tally.assign(n_flux, 0.0);
+    fission_rate_tally.assign(n_flux, 0.0);
+    absorp_rate_tally.assign(n_flux, 0.0);
 }
 
 namespace {
@@ -36,7 +39,8 @@ void Tally::add_absorp_hit(double x, double y) {
     absorp_tally[cell_index(x, y, tally_nx, tally_ny, tally_dx, tally_dy)]++;
 }
 
-void Tally::add_flux_track(double x0, double y0, double x1, double y1, int group) {
+void Tally::add_flux_track(double x0, double y0, double x1, double y1, int group,
+                           double sigma_f, double sigma_a) {
     if (tally_nx <= 0 || tally_ny <= 0 || tally_dx <= 0.0 || tally_dy <= 0.0)
         return;
     if (group < 0 || group >= flux_groups)
@@ -87,8 +91,12 @@ void Tally::add_flux_track(double x0, double y0, double x1, double y1, int group
         double t_next = std::min({t_max_x, t_max_y, 1.0});
 
         double seg_len = (t_next - t) * length;
-        if (seg_len > 0.0)
-            flux_tally[group_offset + static_cast<size_t>(iy) * tally_nx + ix] += seg_len;
+        if (seg_len > 0.0) {
+            const size_t idx = group_offset + static_cast<size_t>(iy) * tally_nx + ix;
+            flux_tally[idx] += seg_len;
+            if (sigma_f != 0.0) fission_rate_tally[idx] += seg_len * sigma_f;
+            if (sigma_a != 0.0) absorp_rate_tally[idx]  += seg_len * sigma_a;
+        }
 
         t = t_next;
         // advance whichever axis (or both, on an exact corner hit) hit its line
