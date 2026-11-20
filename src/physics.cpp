@@ -1,4 +1,5 @@
 #include "physics.hpp"
+#include <algorithm>
 #include <cmath>
 #include <random>
 
@@ -25,6 +26,27 @@ double alpha_count(double A) {
 
 double E_scatter(double E, double alpha, double phi) {
     return E * ((1.0 + alpha) + (1.0 - alpha) * std::cos(phi)) / 2.0;
+}
+
+void scatter_elastic(double A, double& E, double& mu_x, double& mu_y, std::mt19937& gen) {
+    std::uniform_real_distribution<double> dist_R(0.0, 1.0);
+
+    const double mu_cm = 2.0 * dist_R(gen) - 1.0;           // isotropic in the CM frame
+    const double alpha = alpha_count(A);
+    E *= ((1.0 + alpha) + (1.0 - alpha) * mu_cm) / 2.0;     // energy after the collision
+
+    // lab-frame deflection from the same CM angle
+    const double denom = std::sqrt(A * A + 2.0 * A * mu_cm + 1.0);
+    double cos_psi = (denom > 1e-12) ? (1.0 + A * mu_cm) / denom : 0.0;  // denom -> 0 only for A=1, mu_cm=-1
+    cos_psi = std::clamp(cos_psi, -1.0, 1.0);
+    double sin_psi = std::sqrt(std::max(0.0, 1.0 - cos_psi * cos_psi));
+    if (dist_R(gen) < 0.5) sin_psi = -sin_psi;               // turn left or right of the incoming direction
+
+    const double nx = mu_x * cos_psi - mu_y * sin_psi;
+    const double ny = mu_x * sin_psi + mu_y * cos_psi;
+    const double norm = std::sqrt(nx * nx + ny * ny);        // keep |mu| = 1 against rounding drift
+    mu_x = nx / norm;
+    mu_y = ny / norm;
 }
 
 int sample_fission_neutrons(double nu, std::mt19937& gen) {

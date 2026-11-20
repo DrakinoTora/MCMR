@@ -276,11 +276,9 @@ void Simulation::run(std::optional<std::uint64_t> seed) {
             double P = dist_R(gen);
 
             if (P < P_scatter) {
-                phi = dist_phi(gen);
-                mu_x = std::cos(phi);
-                mu_y = std::sin(phi);
-                double alpha = alpha_count(cur_mat.A);
-                E = E_scatter(E, alpha, phi);
+                // energy loss AND new direction both come from one CM-frame
+                // scattering angle, relative to the incoming direction
+                scatter_elastic(cur_mat.A, E, mu_x, mu_y, gen);
             } else {
                 alive = false;
                 results.add_absorp_hit(x, y);

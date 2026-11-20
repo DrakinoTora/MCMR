@@ -1,0 +1,232 @@
+[
+ {
+  "uji": "A1 neraca eksak [W1 (grid)]",
+  "ringkasan": "obs == N*gen pada semua seed: [(1200000, 1200000), (1200000, 1200000), (1200000, 1200000)]",
+  "lulus": true
+ },
+ {
+  "uji": "A1 sisi reflektif tidak bocor [W1 (grid)]",
+  "ringkasan": "kanan/bawah = [(0, 0), (0, 0), (0, 0)]; sisi vakum bocor = [(225951, 95109), (225928, 96385), (226232, 94665)]",
+  "lulus": true
+ },
+ {
+  "uji": "A1 tally fluks vs hitungan: tangkapan [W1 (grid)]",
+  "ringkasan": "per seed (n sel, mean z, std z, max|z|, rasio total) = (768, +0.07, 0.98, 3.7, 1.0023); (768, -0.01, 1.02, 3.1, 0.9985); (768, -0.00, 0.96, 3.2, 1.0004)",
+  "lulus": true
+ },
+ {
+  "uji": "A1 tally fluks vs hitungan: fisi [W1 (grid)]",
+  "ringkasan": "per seed (n sel, mean z, std z, max|z|, rasio total) = (360, -0.15, 0.97, 2.7, 0.9951); (360, -0.01, 0.95, 2.7, 0.9994); (360, +0.08, 1.00, 3.6, 1.0029)",
+  "lulus": true
+ },
+ {
+  "uji": "A1 estimator k vs produksi dari tally fluks [W1 (grid)]",
+  "ringkasan": "z per seed = -2.57, -0.39, +1.38; rasio = 0.99507, 0.99926, 1.00266",
+  "lulus": true
+ },
+ {
+  "uji": "A1 neraca eksak [W2 (grid + 2 lingkaran)]",
+  "ringkasan": "obs == N*gen pada semua seed: [(1200000, 1200000), (1200000, 1200000), (1200000, 1200000)]",
+  "lulus": true
+ },
+ {
+  "uji": "A1 sisi reflektif tidak bocor [W2 (grid + 2 lingkaran)]",
+  "ringkasan": "kanan/bawah = [(0, 0), (0, 0), (0, 0)]; sisi vakum bocor = [(224404, 98992), (223555, 98985), (224291, 98613)]",
+  "lulus": true
+ },
+ {
+  "uji": "A1 tally fluks vs hitungan: tangkapan [W2 (grid + 2 lingkaran)]",
+  "ringkasan": "per seed (n sel, mean z, std z, max|z|, rasio total) = (704, +0.02, 1.04, 3.5, 1.0013); (704, -0.02, 0.99, 3.6, 0.9993); (704, -0.04, 1.02, 3.4, 0.9996)",
+  "lulus": true
+ },
+ {
+  "uji": "A1 tally fluks vs hitungan: fisi [W2 (grid + 2 lingkaran)]",
+  "ringkasan": "per seed (n sel, mean z, std z, max|z|, rasio total) = (332, -0.06, 0.99, 3.0, 0.9975); (332, -0.00, 1.00, 3.0, 0.9996); (332, +0.03, 1.13, 3.6, 1.0006)",
+  "lulus": true
+ },
+ {
+  "uji": "A2 V1 sel dipecah + nama kembaran",
+  "ringkasan": "k = 0.73260 vs dasar 0.73287, selisih -27 pcm, z = -0.55",
+  "lulus": true
+ },
+ {
+  "uji": "A2 V2 lingkaran bermaterial kembar",
+  "ringkasan": "k = 0.73250 vs dasar 0.73287, selisih -37 pcm, z = -0.75",
+  "lulus": true
+ },
+ {
+  "uji": "A2 V3 skala x2",
+  "ringkasan": "k = 0.73282 vs dasar 0.73287, selisih -6 pcm, z = -0.16",
+  "lulus": true
+ },
+ {
+  "uji": "A2 V3 skala x0.5",
+  "ringkasan": "k = 0.73276 vs dasar 0.73287, selisih -12 pcm, z = -0.29",
+  "lulus": true
+ },
+ {
+  "uji": "A2 V4 cermin x",
+  "ringkasan": "k = 0.73277 vs dasar 0.73287, selisih -11 pcm, z = -0.24",
+  "lulus": true
+ },
+ {
+  "uji": "A2 V5 transpos x<->y",
+  "ringkasan": "k = 0.73289 vs dasar 0.73287, selisih +1 pcm, z = +0.03",
+  "lulus": true
+ },
+ {
+  "uji": "A2 model setengah (batas reflektif) vs model penuh",
+  "ringkasan": "selisih -45 pcm, z = -0.98",
+  "lulus": true
+ },
+ {
+  "uji": "A2 simetri kebocoran kiri vs kanan",
+  "ringkasan": "L = 306289, R = 305859, z = +0.55",
+  "lulus": true
+ },
+ {
+  "uji": "A2 simetri kebocoran atas vs bawah",
+  "ringkasan": "T = 1815515, B = 1815926, z = -0.22",
+  "lulus": true
+ },
+ {
+  "uji": "A3a z-score: rata-rata 0",
+  "ringkasan": "mean z = -0.012 +- 0.100",
+  "lulus": true
+ },
+ {
+  "uji": "A3a z-score: deviasi 1 (galat jujur)",
+  "ringkasan": "std z = 1.079",
+  "lulus": true
+ },
+ {
+  "uji": "A3b bias tak hingga, N=250",
+  "ringkasan": "+144 +- 85 pcm, z = +1.70",
+  "lulus": true
+ },
+ {
+  "uji": "A3b bias tak hingga, N=500",
+  "ringkasan": "+117 +- 65 pcm, z = +1.81",
+  "lulus": true
+ },
+ {
+  "uji": "A3b bias tak hingga, N=1000",
+  "ringkasan": "+60 +- 84 pcm, z = +0.71",
+  "lulus": true
+ },
+ {
+  "uji": "A3b bias tak hingga, N=2500",
+  "ringkasan": "+57 +- 93 pcm, z = +0.62",
+  "lulus": true
+ },
+ {
+  "uji": "A3b bias tak hingga, N=5000",
+  "ringkasan": "-52 +- 67 pcm, z = -0.77",
+  "lulus": true
+ },
+ {
+  "uji": "A3b bias tak hingga, N=20000",
+  "ringkasan": "-55 +- 123 pcm, z = -0.45",
+  "lulus": true
+ },
+ {
+  "uji": "A3b bias soal bocor B, N=250 vs N=20000",
+  "ringkasan": "+15 pcm, z = +0.20",
+  "lulus": true
+ },
+ {
+  "uji": "A3b bias soal bocor B, N=500 vs N=20000",
+  "ringkasan": "-76 pcm, z = -0.93",
+  "lulus": true
+ },
+ {
+  "uji": "A3b bias soal bocor B, N=1000 vs N=20000",
+  "ringkasan": "+128 pcm, z = +1.90",
+  "lulus": true
+ },
+ {
+  "uji": "A3b bias soal bocor B, N=2500 vs N=20000",
+  "ringkasan": "-33 pcm, z = -0.68",
+  "lulus": true
+ },
+ {
+  "uji": "A3b bias soal bocor B, N=5000 vs N=20000",
+  "ringkasan": "-92 pcm, z = -1.25",
+  "lulus": true
+ },
+ {
+  "uji": "A3c k_analitik = 0.4203",
+  "ringkasan": "k = 0.42052 +- 0.00019, +27 pcm, z = +1.42",
+  "lulus": true
+ },
+ {
+  "uji": "A3c k_analitik = 0.9606",
+  "ringkasan": "k = 0.96070 +- 0.00057, +12 pcm, z = +0.22",
+  "lulus": true
+ },
+ {
+  "uji": "A3c k_analitik = 1.1407",
+  "ringkasan": "k = 1.14051 +- 0.00032, -18 pcm, z = -0.55",
+  "lulus": true
+ },
+ {
+  "uji": "A3c k_analitik = 1.0000",
+  "ringkasan": "k = 1.00016 +- 0.00037, +16 pcm, z = +0.43",
+  "lulus": true
+ },
+ {
+  "uji": "A3c k_analitik = 1.2608",
+  "ringkasan": "k = 1.26177 +- 0.00063, +101 pcm, z = +1.59",
+  "lulus": true
+ },
+ {
+  "uji": "A3c k_analitik = 1.8011",
+  "ringkasan": "k = 1.80241 +- 0.00075, +133 pcm, z = +1.77",
+  "lulus": true
+ },
+ {
+  "uji": "A3c k_analitik = 3.0018",
+  "ringkasan": "k = 2.99951 +- 0.00068, -230 pcm, z = -3.41",
+  "lulus": false
+ },
+ {
+  "uji": "A3c k_initial = 0.3",
+  "ringkasan": "k = 1.20119 +- 0.00034, +47 pcm, z = +1.36",
+  "lulus": true
+ },
+ {
+  "uji": "A3c k_initial = 3.0",
+  "ringkasan": "k = 1.20178 +- 0.00035, +106 pcm, z = +3.03",
+  "lulus": false
+ },
+ {
+  "uji": "A3d 12 grup acak: k",
+  "ringkasan": "k = 0.31941 +- 0.00033 vs 0.31847, z = +2.85",
+  "lulus": true
+ },
+ {
+  "uji": "A3d 12 grup acak: spektrum fluks (12 grup)",
+  "ringkasan": "max|z| = 2.24; grup 8 (terisolasi) = 0.00214 vs 0.00215; grup 5 (tanpa hamburan) = 0.50172 vs 0.50198",
+  "lulus": false
+ },
+ {
+  "uji": "A3d tanpa chi_fission (anak mewarisi grup induk)",
+  "ringkasan": "k = 1.30755 +- 0.00021 vs analitik 1.30701, z = +2.67",
+  "lulus": true
+ },
+ {
+  "uji": "A3e k_initial = 0.3 (skip=10, 150 run)",
+  "ringkasan": "+10 +- 19 pcm, z = +0.51",
+  "lulus": true
+ },
+ {
+  "uji": "A3e k_initial = 1.0 (skip=10, 150 run)",
+  "ringkasan": "+0 +- 19 pcm, z = +0.01",
+  "lulus": true
+ },
+ {
+  "uji": "A3e k_initial = 3.0 (skip=10, 150 run)",
+  "ringkasan": "-26 +- 20 pcm, z = -1.28",
+  "lulus": true
+ }
+]

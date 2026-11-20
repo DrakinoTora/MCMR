@@ -134,7 +134,10 @@ double Grid::distance_to_boundary(double x, double y, double mu_x, double mu_y,
     }
 
     if (d_min <= 0.0) {
-        hit_side = Side::None;
+        // Neutron is on or (by a rounding/nudge error) just past a boundary.
+        // A WORLD edge must still be processed (reflect / leak), so keep hit_side and
+        // report distance 0. Only an interior boundary or circle falls back to the tiny step.
+        if (hit_side != Side::None) return 0.0;
         return 1e-6;
     }
     return d_min;
